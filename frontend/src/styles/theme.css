@@ -1,0 +1,18 @@
+﻿:root {
+  --color-bg: #f5eedf;
+  --color-surface: rgba(255, 250, 242, 0.92);
+  --color-surface-strong: #f7f0e4;
+  --color-primary: #8d4f2a;
+  --color-primary-deep: #61331a;
+  --color-secondary: #6e8661;
+  --color-text: #2f241c;
+  --color-text-soft: #68574a;
+  --color-border: rgba(99, 66, 42, 0.15);
+  --shadow-soft: 0 24px 60px rgba(72, 45, 24, 0.12);
+  --radius-large: 28px;
+  --radius-medium: 20px;
+  --radius-small: 14px;
+  --content-width: 1200px;
+  --font-display: "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Microsoft YaHei", "PingFang SC", sans-serif;
+}

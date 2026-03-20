@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+backend/.env
+frontend/.env
+.venv/
+venv/
+.vscode/
+frontend/.npm-cache/
+.DS_Store
+Thumbs.db

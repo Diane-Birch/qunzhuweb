@@ -1,0 +1,49 @@
+﻿import { createRouter, createWebHistory } from "vue-router";
+
+import HomeView from "../views/HomeView.vue";
+import AdminDashboard from "../views/admin/AdminDashboard.vue";
+import AdminLogin from "../views/admin/AdminLogin.vue";
+import { getToken } from "../utils/auth";
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: "/",
+      name: "home",
+      component: HomeView,
+    },
+    {
+      path: "/admin/login",
+      name: "admin-login",
+      component: AdminLogin,
+    },
+    {
+      path: "/admin",
+      redirect: "/admin/dashboard",
+    },
+    {
+      path: "/admin/dashboard",
+      name: "admin-dashboard",
+      component: AdminDashboard,
+      meta: { requiresAuth: true },
+    },
+  ],
+  scrollBehavior() {
+    return { top: 0 };
+  },
+});
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresAuth && !getToken()) {
+    next({ name: "admin-login" });
+    return;
+  }
+  if (to.name === "admin-login" && getToken()) {
+    next({ name: "admin-dashboard" });
+    return;
+  }
+  next();
+});
+
+export default router;
