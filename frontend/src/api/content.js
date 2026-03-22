@@ -1,7 +1,28 @@
-﻿import http from "./http";
+import http from "./http";
 
 export const fetchHomepage = async () => {
   const { data } = await http.get("/public/home");
+  return data;
+};
+
+export const fetchFooterSettings = async () => {
+  const { data } = await http.get("/site-settings/footer-settings");
+  return data;
+};
+
+export const saveFooterSettings = async (payload) => {
+  const { data } = await http.put("/site-settings/footer-settings", payload);
+  return data;
+};
+
+export const uploadSiteSettingImage = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await http.post("/site-settings/upload-image", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return data;
 };
 

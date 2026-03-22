@@ -1,9 +1,12 @@
-﻿from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, engine
-from backend.app.routers import auth, banners, news, products, public, sections
+from backend.app.routers import auth, banners, news, products, public, sections, site_settings
 from backend.app.services.init_data import seed_admin, seed_content
 
 # Import all models before metadata creation so SQLAlchemy can discover tables.
@@ -20,6 +23,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 @app.get("/")
@@ -46,3 +53,4 @@ app.include_router(banners.router, prefix=settings.api_v1_prefix)
 app.include_router(sections.router, prefix=settings.api_v1_prefix)
 app.include_router(products.router, prefix=settings.api_v1_prefix)
 app.include_router(news.router, prefix=settings.api_v1_prefix)
+app.include_router(site_settings.router, prefix=settings.api_v1_prefix)

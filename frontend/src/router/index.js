@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 
 import HomeView from "../views/HomeView.vue";
 import AdminDashboard from "../views/admin/AdminDashboard.vue";
@@ -29,8 +29,15 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
   ],
-  scrollBehavior() {
-    return { top: 0 };
+  scrollBehavior(to) {
+    if (to.hash) {
+      return {
+        el: to.hash,
+        top: 96,
+        behavior: "smooth",
+      };
+    }
+    return { top: 0, behavior: "smooth" };
   },
 });
 

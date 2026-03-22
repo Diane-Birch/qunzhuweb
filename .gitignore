@@ -14,3 +14,4 @@ venv/
 frontend/.npm-cache/
 .DS_Store
 Thumbs.db
+backend/uploads/

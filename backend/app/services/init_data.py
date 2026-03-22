@@ -1,11 +1,11 @@
-﻿import json
+import json
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
 from backend.app.core.security import get_password_hash
-from backend.app.models import AdminUser, HeroBanner, NewsArticle, Product, SiteSection
+from backend.app.models import AdminUser, HeroBanner, NewsArticle, Product, SiteSection, SiteSetting
 
 
 settings = get_settings()
@@ -134,6 +134,16 @@ DEFAULT_NEWS = [
     },
 ]
 
+DEFAULT_SITE_SETTINGS = [
+    {
+        "key": "footer_qr",
+        "name": "页脚二维码",
+        "description": "扫码关注我们",
+        "image_url": None,
+        "is_active": True,
+    }
+]
+
 
 def seed_admin(db: Session) -> None:
     """Create or repair the single admin account required by the management console."""
@@ -150,6 +160,7 @@ def seed_admin(db: Session) -> None:
     db.commit()
 
 
+
 def seed_content(db: Session) -> None:
     """Seed demo content only when the site is still empty, preserving later edits."""
     if not db.query(HeroBanner).first():
@@ -160,4 +171,6 @@ def seed_content(db: Session) -> None:
         db.add_all(Product(**item) for item in DEFAULT_PRODUCTS)
     if not db.query(NewsArticle).first():
         db.add_all(NewsArticle(**item) for item in DEFAULT_NEWS)
+    if not db.query(SiteSetting).first():
+        db.add_all(SiteSetting(**item) for item in DEFAULT_SITE_SETTINGS)
     db.commit()

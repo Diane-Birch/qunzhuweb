@@ -1,12 +1,14 @@
-﻿from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
+
+from fastapi import APIRouter, Depends
 
 from backend.app.core.database import get_db
 from backend.app.models.banner import HeroBanner
 from backend.app.models.news import NewsArticle
 from backend.app.models.product import Product
 from backend.app.models.section import SiteSection
+from backend.app.models.site_setting import SiteSetting
 from backend.app.schemas.public import HomePageResponse
-from fastapi import APIRouter, Depends
 
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -52,6 +54,17 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
         .filter(SiteSection.key == "news_intro", SiteSection.is_active.is_(True))
         .first()
     )
+    footer_qr = (
+        db.query(SiteSetting)
+        .filter(SiteSetting.key == "footer_qr", SiteSetting.is_active.is_(True))
+        .first()
+    )
+    footer_filing = (
+        db.query(SiteSetting)
+        .filter(SiteSetting.key == "footer_filing", SiteSetting.is_active.is_(True))
+        .first()
+    )
+
     return HomePageResponse(
         banners=banners,
         sections=sections,
@@ -59,4 +72,6 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
         news=news,
         product_intro=product_intro,
         news_intro=news_intro,
+        footer_qr=footer_qr,
+        footer_filing=footer_filing,
     )

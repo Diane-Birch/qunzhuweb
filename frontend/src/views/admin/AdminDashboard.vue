@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="dashboard-page earthy-panel">
     <header class="dashboard-header">
       <div>
@@ -139,6 +139,83 @@
             @current-change="(page) => loadNews(page)"
           />
         </el-tab-pane>
+
+        <el-tab-pane label="站点配置" name="site-settings">
+          <section class="panel-toolbar">
+            <span>维护页脚二维码、说明文字和备案信息，保存后首页自动通过接口读取</span>
+            <el-button type="primary" :loading="footerSettingsState.saving" @click="submitFooterSettings">保存配置</el-button>
+          </section>
+
+          <div class="site-setting-panel" v-loading="footerSettingsState.loading">
+            <el-row :gutter="22">
+              <el-col :lg="12" :md="24">
+                <section class="site-card surface-card">
+                  <div class="site-card-header">
+                    <h3>二维码展示</h3>
+                    <el-switch v-model="footerSettingsState.form.qr_is_active" />
+                  </div>
+
+                  <div class="qr-preview-wrap">
+                    <div class="qr-preview-panel">
+                      <img v-if="footerSettingsState.form.qr_image_url" :src="footerSettingsState.form.qr_image_url" :alt="footerSettingsState.form.qr_name || '页脚二维码'" />
+                      <el-empty v-else description="尚未上传二维码" />
+                    </div>
+
+                    <div class="qr-actions">
+                      <el-upload accept="image/*" :show-file-list="false" :http-request="handleFooterQrUpload">
+                        <el-button type="primary" :loading="footerSettingsState.uploading">上传二维码</el-button>
+                      </el-upload>
+                      <el-button plain @click="clearFooterQrImage">清空图片</el-button>
+                      <span class="upload-tip">建议上传清晰的正方形二维码，前台默认 150 × 150px，移动端自动缩小。</span>
+                    </div>
+                  </div>
+
+                  <el-form label-position="top" :model="footerSettingsState.form">
+                    <el-form-item label="二维码标题">
+                      <el-input v-model="footerSettingsState.form.qr_name" placeholder="例如：扫码关注我们" />
+                    </el-form-item>
+                    <el-form-item label="说明文字">
+                      <el-input v-model="footerSettingsState.form.qr_description" maxlength="255" show-word-limit placeholder="例如：扫码关注我们，了解红河梯田新讯" />
+                    </el-form-item>
+                    <el-form-item label="图片链接">
+                      <el-input v-model="footerSettingsState.form.qr_image_url" placeholder="上传后自动回填，也支持手动填写" />
+                    </el-form-item>
+                  </el-form>
+                </section>
+              </el-col>
+
+              <el-col :lg="12" :md="24">
+                <section class="site-card surface-card">
+                  <div class="site-card-header">
+                    <h3>备案信息展示</h3>
+                    <el-switch v-model="footerSettingsState.form.filing_is_active" />
+                  </div>
+
+                  <el-form label-position="top" :model="footerSettingsState.form">
+                    <el-form-item label="备案信息标题">
+                      <el-input v-model="footerSettingsState.form.filing_name" placeholder="例如：备案信息" />
+                    </el-form-item>
+                    <el-form-item label="备案信息内容">
+                      <el-input
+                        v-model="footerSettingsState.form.filing_text"
+                        type="textarea"
+                        :rows="5"
+                        maxlength="255"
+                        show-word-limit
+                        placeholder="例如：滇ICP备2026000001号-1"
+                      />
+                    </el-form-item>
+                  </el-form>
+
+                  <div class="filing-preview surface-card">
+                    <span class="filing-preview-label">{{ footerSettingsState.form.filing_name || '备案信息' }}</span>
+                    <p>{{ footerSettingsState.form.filing_text || '备案信息将在这里展示。' }}</p>
+                  </div>
+                </section>
+              </el-col>
+            </el-row>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </main>
 
@@ -276,9 +353,9 @@
 </template>
 
 <script setup>
+import { ElMessage, ElMessageBox } from "element-plus";
 import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage, ElMessageBox } from "element-plus";
 
 import {
   createBanner,
@@ -290,13 +367,16 @@ import {
   deleteProduct,
   deleteSection,
   fetchBanners,
+  fetchFooterSettings,
   fetchNews,
   fetchProducts,
   fetchSections,
+  saveFooterSettings,
   updateBanner,
   updateNews,
   updateProduct,
   updateSection,
+  uploadSiteSettingImage,
 } from "../../api/content";
 import { clearToken } from "../../utils/auth";
 
@@ -363,10 +443,26 @@ const createNewsForm = () => ({
   is_active: true,
 });
 
+const createFooterSettingsForm = () => ({
+  qr_name: "页脚二维码",
+  qr_description: "扫码关注我们",
+  qr_image_url: "",
+  qr_is_active: true,
+  filing_name: "备案信息",
+  filing_text: "",
+  filing_is_active: true,
+});
+
 const bannerDialog = reactive({ visible: false, submitting: false, form: createBannerForm() });
 const sectionDialog = reactive({ visible: false, submitting: false, form: createSectionForm() });
 const productDialog = reactive({ visible: false, submitting: false, form: createProductForm() });
 const newsDialog = reactive({ visible: false, submitting: false, form: createNewsForm() });
+const footerSettingsState = reactive({
+  loading: false,
+  saving: false,
+  uploading: false,
+  form: createFooterSettingsForm(),
+});
 
 const syncList = (state, data, page) => {
   state.items = data.items;
@@ -410,9 +506,37 @@ const loadNews = async (page = newsState.page) => {
   }
 };
 
+const loadFooterSettings = async () => {
+  footerSettingsState.loading = true;
+  try {
+    const data = await fetchFooterSettings();
+    footerSettingsState.form = {
+      qr_name: data.footer_qr?.name || "页脚二维码",
+      qr_description: data.footer_qr?.description || "",
+      qr_image_url: data.footer_qr?.image_url || "",
+      qr_is_active: data.footer_qr?.is_active ?? true,
+      filing_name: data.footer_filing?.name || "备案信息",
+      filing_text: data.footer_filing?.description || "",
+      filing_is_active: data.footer_filing?.is_active ?? true,
+    };
+  } finally {
+    footerSettingsState.loading = false;
+  }
+};
+
+const buildFooterSettingsPayload = () => ({
+  qr_name: footerSettingsState.form.qr_name,
+  qr_description: footerSettingsState.form.qr_description,
+  qr_image_url: footerSettingsState.form.qr_image_url,
+  qr_is_active: footerSettingsState.form.qr_is_active,
+  filing_name: footerSettingsState.form.filing_name,
+  filing_text: footerSettingsState.form.filing_text,
+  filing_is_active: footerSettingsState.form.filing_is_active,
+});
+
 const refreshAll = async () => {
   try {
-    await Promise.all([loadBanners(), loadSections(), loadProducts(), loadNews()]);
+    await Promise.all([loadBanners(), loadSections(), loadProducts(), loadNews(), loadFooterSettings()]);
     ElMessage.success("数据已刷新");
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || "数据刷新失败");
@@ -519,6 +643,46 @@ const submitNews = async () => {
   }
 };
 
+const submitFooterSettings = async () => {
+  footerSettingsState.saving = true;
+  try {
+    const data = await saveFooterSettings(buildFooterSettingsPayload());
+    footerSettingsState.form = {
+      qr_name: data.footer_qr?.name || "页脚二维码",
+      qr_description: data.footer_qr?.description || "",
+      qr_image_url: data.footer_qr?.image_url || "",
+      qr_is_active: data.footer_qr?.is_active ?? true,
+      filing_name: data.footer_filing?.name || "备案信息",
+      filing_text: data.footer_filing?.description || "",
+      filing_is_active: data.footer_filing?.is_active ?? true,
+    };
+    ElMessage.success("页脚配置已保存");
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || "页脚配置保存失败");
+  } finally {
+    footerSettingsState.saving = false;
+  }
+};
+
+const handleFooterQrUpload = async (options) => {
+  footerSettingsState.uploading = true;
+  try {
+    const data = await uploadSiteSettingImage(options.file);
+    footerSettingsState.form.qr_image_url = data.url;
+    options.onSuccess?.(data);
+    ElMessage.success("二维码图片上传成功");
+  } catch (error) {
+    options.onError?.(error);
+    ElMessage.error(error.response?.data?.detail || "二维码图片上传失败");
+  } finally {
+    footerSettingsState.uploading = false;
+  }
+};
+
+const clearFooterQrImage = () => {
+  footerSettingsState.form.qr_image_url = "";
+};
+
 const handleDelete = async (type, row) => {
   try {
     await ElMessageBox.confirm(`确认删除“${row.title || row.name}”吗？`, "删除确认", {
@@ -620,6 +784,88 @@ onMounted(refreshAll);
   margin-top: 18px;
 }
 
+.site-setting-panel {
+  padding-top: 6px;
+}
+
+.site-card {
+  height: 100%;
+  padding: 24px;
+  border-radius: 24px;
+}
+
+.site-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.site-card-header h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.qr-preview-wrap {
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.qr-preview-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 250, 242, 0.88);
+  border: 1px solid rgba(99, 66, 42, 0.08);
+}
+
+.qr-preview-panel img {
+  width: 100%;
+  max-width: 170px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+}
+
+.qr-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.upload-tip {
+  color: var(--color-text-soft);
+  line-height: 1.7;
+}
+
+.filing-preview {
+  margin-top: 10px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(110, 134, 97, 0.08);
+}
+
+.filing-preview-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: var(--color-secondary);
+  letter-spacing: 0.12em;
+}
+
+.filing-preview p {
+  margin: 0;
+  color: var(--color-text-soft);
+  line-height: 1.7;
+  word-break: break-all;
+}
+
 @media (max-width: 900px) {
   .dashboard-header,
   .panel-toolbar {
@@ -630,6 +876,10 @@ onMounted(refreshAll);
   .header-actions {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .qr-preview-wrap {
+    grid-template-columns: 1fr;
   }
 }
 </style>
