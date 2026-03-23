@@ -15,16 +15,19 @@ export const saveFooterSettings = async (payload) => {
   return data;
 };
 
-export const uploadSiteSettingImage = async (file) => {
+export const uploadMediaAsset = async (file, mediaType = "image") => {
   const formData = new FormData();
   formData.append("file", file);
-  const { data } = await http.post("/site-settings/upload-image", formData, {
+  const { data } = await http.post("/site-settings/upload-media", formData, {
+    params: { media_type: mediaType },
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
   return data;
 };
+
+export const uploadSiteSettingImage = async (file) => uploadMediaAsset(file, "image");
 
 export const loginAdmin = async (payload) => {
   const { data } = await http.post("/auth/login", payload);

@@ -1,12 +1,12 @@
-<template>
+﻿<template>
   <div>
     <header class="topbar">
       <div class="page-shell topbar-inner">
         <div class="brand-group">
-          <button class="brand-logo-button" type="button" aria-label="返回网站首页" @click="goHome">
-            <img :src="logoImage" alt="红河文化站 logo" class="brand-logo" />
+          <button class="brand-logo-button" type="button" :aria-label="siteTitle" @click="goHome">
+            <img :src="logoImage" :alt="`${siteTitle} logo`" class="brand-logo" />
           </button>
-          <button class="brand-title" type="button" @click="goHome">红河文化站</button>
+          <button class="brand-title" type="button" @click="goHome">{{ siteTitle }}</button>
         </div>
 
         <div class="topbar-menu">
@@ -17,7 +17,7 @@
             @command="handleNavCommand"
           >
             <button class="nav-trigger" type="button">
-              <span>导航菜单</span>
+              <span>{{ navMenuLabel }}</span>
               <el-icon><ArrowDown /></el-icon>
             </button>
             <template #dropdown>
@@ -63,8 +63,16 @@
                   </div>
                 </div>
               </div>
-              <div v-if="section.image_url" class="story-image">
-                <img :src="section.image_url" :alt="section.title" />
+              <div v-if="hasSectionMedia(section)" class="story-image">
+                <MediaAsset
+                  :media-type="section.media_type || 'image'"
+                  :image-url="section.image_url"
+                  :video-url="section.video_url"
+                  :alt="section.title"
+                  :controls="(section.media_type || 'image') === 'video'"
+                  wrapper-class="story-media-wrap"
+                  element-class="story-media"
+                />
               </div>
             </article>
           </div>
@@ -83,7 +91,7 @@
             <ProductCard v-for="item in homepage.products" :key="item.id" :item="item" />
           </div>
           <div v-if="!homepage.products.length && !loading" class="surface-card empty-card">
-            <el-empty description="后台暂未发布产品内容" />
+            <el-empty :description="emptyProductText" />
           </div>
         </div>
       </section>
@@ -100,7 +108,7 @@
             <NewsCard v-for="item in homepage.news" :key="item.id" :item="item" />
           </div>
           <div v-if="!homepage.news.length && !loading" class="surface-card empty-card">
-            <el-empty description="后台暂未发布新闻动态" />
+            <el-empty :description="emptyNewsText" />
           </div>
         </div>
       </section>
@@ -122,12 +130,12 @@
       </section>
 
       <div class="page-shell footer-shell">
-        <section class="footer-panel surface-card" aria-label="页脚二维码与备案信息区">
+        <section class="footer-panel surface-card" aria-label="Footer information">
           <div v-if="showQrImage" class="footer-qr-stage">
             <div class="footer-qr-frame">
               <img
                 :src="homepage.footer_qr.image_url"
-                :alt="homepage.footer_qr.name || '页脚二维码'"
+                :alt="homepage.footer_qr.name || qrFallbackLabel"
                 class="footer-qr-image"
               />
             </div>
@@ -138,7 +146,7 @@
             <p v-if="showQrDescription" class="footer-description">{{ homepage.footer_qr.description }}</p>
 
             <div v-if="showFilingInfo" class="footer-filing-block">
-              <span class="footer-filing-label">{{ homepage.footer_filing.name || '备案信息' }}</span>
+              <span class="footer-filing-label">{{ homepage.footer_filing.name || filingFallbackLabel }}</span>
               <p class="footer-filing-copy">{{ homepage.footer_filing.description }}</p>
             </div>
           </div>
@@ -156,6 +164,7 @@ import { useRouter } from "vue-router";
 
 import { fetchHomepage } from "../api/content";
 import HeroCarousel from "../components/HeroCarousel.vue";
+import MediaAsset from "../components/MediaAsset.vue";
 import NewsCard from "../components/NewsCard.vue";
 import ProductCard from "../components/ProductCard.vue";
 import SectionHeading from "../components/SectionHeading.vue";
@@ -163,6 +172,12 @@ import logoImage from "../../logo/logo.png";
 
 const router = useRouter();
 const loading = ref(true);
+const siteTitle = "\u7ea2\u6cb3\u6587\u5316\u7ad9";
+const navMenuLabel = "\u5bfc\u822a\u83dc\u5355";
+const emptyProductText = "\u6682\u65e0\u4ea7\u54c1\u5185\u5bb9";
+const emptyNewsText = "\u6682\u65e0\u65b0\u95fb\u5185\u5bb9";
+const qrFallbackLabel = "\u626b\u7801\u5173\u6ce8";
+const filingFallbackLabel = "\u5907\u6848\u4fe1\u606f";
 const homepage = reactive({
   banners: [],
   sections: [],
@@ -175,16 +190,18 @@ const homepage = reactive({
 });
 
 const menuItems = [
-  { label: "文化亮点", command: "#culture" },
-  { label: "产品展示", command: "#products" },
-  { label: "企业动态", command: "#news" },
-  { label: "后台管理", command: "/admin/login" },
+  { label: "\u6587\u5316\u4eae\u70b9", command: "#culture" },
+  { label: "\u4ea7\u54c1\u5c55\u793a", command: "#products" },
+  { label: "\u4f01\u4e1a\u52a8\u6001", command: "#news" },
+  { label: "\u540e\u53f0\u7ba1\u7406", command: "/admin/login" },
 ];
 
 const showQrImage = computed(() => Boolean(homepage.footer_qr?.is_active && homepage.footer_qr?.image_url));
 const showQrDescription = computed(() => Boolean(homepage.footer_qr?.is_active && homepage.footer_qr?.description));
 const showFilingInfo = computed(() => Boolean(homepage.footer_filing?.is_active && homepage.footer_filing?.description));
 const hasFooterContent = computed(() => showQrImage.value || showQrDescription.value || showFilingInfo.value);
+
+const hasSectionMedia = (section) => Boolean(section?.video_url || section?.image_url);
 
 const parseExtra = (value) => {
   try {
@@ -213,7 +230,7 @@ const goHome = async () => {
       await router.replace({ path: "/" });
     }
   } catch (error) {
-    // Ignore navigation duplication errors and preserve explicit scroll-to-top behavior.
+    // Ignore duplicate navigation errors.
   }
   window.scrollTo({ top: 0, behavior: "smooth" });
 };
@@ -244,7 +261,7 @@ const loadHomepage = async () => {
     const data = await fetchHomepage();
     Object.assign(homepage, data);
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || "首页数据加载失败");
+    ElMessage.error(error.response?.data?.detail || "\u9996\u9875\u6570\u636e\u52a0\u8f7d\u5931\u8d25");
   } finally {
     loading.value = false;
   }
@@ -372,10 +389,10 @@ onMounted(loadHomepage);
   min-height: 320px;
 }
 
-.story-image img {
+.story-media-wrap,
+.story-media {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .tag-list,

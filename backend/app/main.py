@@ -8,6 +8,7 @@ from backend.app.core.config import get_settings
 from backend.app.core.database import Base, SessionLocal, engine
 from backend.app.routers import auth, banners, news, products, public, sections, site_settings
 from backend.app.services.init_data import seed_admin, seed_content
+from backend.app.services.schema_sync import ensure_legacy_columns
 
 # Import all models before metadata creation so SQLAlchemy can discover tables.
 from backend.app import models  # noqa: F401
@@ -39,6 +40,7 @@ def health_check():
 def on_startup() -> None:
     """Create tables and seed first-run data so the local project is usable immediately."""
     Base.metadata.create_all(bind=engine)
+    ensure_legacy_columns(engine)
     session = SessionLocal()
     try:
         seed_admin(session)

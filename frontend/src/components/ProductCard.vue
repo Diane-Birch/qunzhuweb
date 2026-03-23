@@ -1,7 +1,15 @@
-﻿<template>
+<template>
   <article class="product-card surface-card">
-    <div v-if="item.cover_image" class="product-image">
-      <img :src="item.cover_image" :alt="item.name" />
+    <div v-if="hasMedia" class="product-image">
+      <MediaAsset
+        :media-type="item.media_type || 'image'"
+        :image-url="item.cover_image"
+        :video-url="item.video_url"
+        :alt="item.name"
+        :controls="(item.media_type || 'image') === 'video'"
+        wrapper-class="product-media-wrap"
+        element-class="product-media"
+      />
     </div>
     <div class="product-content">
       <p v-if="item.subtitle" class="product-subtitle">{{ item.subtitle }}</p>
@@ -20,12 +28,16 @@
 <script setup>
 import { computed } from "vue";
 
+import MediaAsset from "./MediaAsset.vue";
+
 const props = defineProps({
   item: {
     type: Object,
     required: true,
   },
 });
+
+const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
 
 const specList = computed(() => {
   try {
@@ -47,10 +59,10 @@ const specList = computed(() => {
   overflow: hidden;
 }
 
-.product-image img {
+.product-media-wrap,
+.product-media {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .product-content {

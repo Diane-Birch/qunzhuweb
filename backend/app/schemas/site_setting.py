@@ -42,3 +42,4 @@ class FooterSettingsUpdate(BaseModel):
 
 class UploadResponse(BaseModel):
     url: str
+    media_type: str

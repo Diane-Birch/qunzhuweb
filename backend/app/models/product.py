@@ -1,4 +1,4 @@
-﻿from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text
 
 from backend.app.models.base import BaseModel, SortableActiveMixin
 
@@ -13,4 +13,6 @@ class Product(BaseModel, SortableActiveMixin):
     subtitle = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
     cover_image = Column(String(500), nullable=True)
+    media_type = Column(String(20), nullable=True)
+    video_url = Column(String(500), nullable=True)
     specs_json = Column(Text, nullable=True)

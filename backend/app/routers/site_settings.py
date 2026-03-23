@@ -1,8 +1,8 @@
+﻿from pathlib import Path
 import shutil
-from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
@@ -18,19 +18,19 @@ FOOTER_QR_KEY = "footer_qr"
 FOOTER_FILING_KEY = "footer_filing"
 DEFAULT_FOOTER_QR = {
     "key": FOOTER_QR_KEY,
-    "name": "页脚二维码",
-    "description": "扫码关注我们",
+    "name": "\u626b\u7801\u5173\u6ce8\u6211\u4eec",
+    "description": "\u83b7\u53d6\u6700\u65b0\u7ea2\u6cb3\u6587\u5316\u4fe1\u606f",
     "image_url": None,
     "is_active": True,
 }
 DEFAULT_FOOTER_FILING = {
     "key": FOOTER_FILING_KEY,
-    "name": "备案信息",
+    "name": "\u5907\u6848\u4fe1\u606f",
     "description": "",
     "image_url": None,
     "is_active": True,
 }
-UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads" / "site-settings"
+UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads"
 IMAGE_SUFFIX_MAP = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -38,7 +38,15 @@ IMAGE_SUFFIX_MAP = {
     "image/webp": ".webp",
     "image/svg+xml": ".svg",
 }
+VIDEO_SUFFIX_MAP = {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/ogg": ".ogv",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
+}
 ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+ALLOWED_VIDEO_SUFFIXES = {".mp4", ".webm", ".ogv", ".mov", ".m4v"}
 
 
 def get_or_create_setting(db: Session, key: str, defaults: dict) -> SiteSetting:
@@ -59,6 +67,35 @@ def get_footer_qr_setting(db: Session) -> SiteSetting:
 
 def get_footer_filing_setting(db: Session) -> SiteSetting:
     return get_or_create_setting(db, FOOTER_FILING_KEY, DEFAULT_FOOTER_FILING)
+
+
+def save_media_file(file: UploadFile, media_type: str) -> UploadResponse:
+    content_type = file.content_type or ""
+    original_suffix = Path(file.filename or "").suffix.lower()
+
+    if media_type == "image":
+        if not content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="Only image files are allowed for image uploads")
+        suffix = original_suffix if original_suffix in ALLOWED_IMAGE_SUFFIXES else IMAGE_SUFFIX_MAP.get(content_type, ".png")
+        subdir = "images"
+    else:
+        if not content_type.startswith("video/"):
+            raise HTTPException(status_code=400, detail="Only video files are allowed for video uploads")
+        suffix = original_suffix if original_suffix in ALLOWED_VIDEO_SUFFIXES else VIDEO_SUFFIX_MAP.get(content_type, ".mp4")
+        subdir = "videos"
+
+    target_dir = UPLOADS_DIR / subdir
+    target_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}{suffix}"
+    target_path = target_dir / filename
+
+    try:
+        with target_path.open("wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    finally:
+        file.file.close()
+
+    return UploadResponse(url=f"/uploads/{subdir}/{filename}", media_type=media_type)
 
 
 @router.get("/footer-settings", response_model=FooterSettingsRead)
@@ -100,29 +137,22 @@ def update_footer_settings(
     )
 
 
+@router.post("/upload-media", response_model=UploadResponse)
+def upload_media_asset(
+    file: UploadFile = File(...),
+    media_type: str = Query("image", pattern="^(image|video)$"),
+    _: AdminUser = Depends(get_current_admin),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file was selected")
+    return save_media_file(file, media_type)
+
+
 @router.post("/upload-image", response_model=UploadResponse)
 def upload_site_setting_image(
     file: UploadFile = File(...),
     _: AdminUser = Depends(get_current_admin),
 ):
     if not file.filename:
-        raise HTTPException(status_code=400, detail="未选择上传文件")
-
-    content_type = file.content_type or ""
-    if not content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="仅支持上传图片文件")
-
-    original_suffix = Path(file.filename).suffix.lower()
-    suffix = original_suffix if original_suffix in ALLOWED_IMAGE_SUFFIXES else IMAGE_SUFFIX_MAP.get(content_type, ".png")
-
-    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid4().hex}{suffix}"
-    target_path = UPLOADS_DIR / filename
-
-    try:
-        with target_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    finally:
-        file.file.close()
-
-    return UploadResponse(url=f"/uploads/site-settings/{filename}")
+        raise HTTPException(status_code=400, detail="No file was selected")
+    return save_media_file(file, "image")

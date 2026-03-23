@@ -1,7 +1,15 @@
-﻿<template>
+<template>
   <article class="news-card surface-card">
-    <div v-if="item.cover_image" class="news-image">
-      <img :src="item.cover_image" :alt="item.title" />
+    <div v-if="hasMedia" class="news-image">
+      <MediaAsset
+        :media-type="item.media_type || 'image'"
+        :image-url="item.cover_image"
+        :video-url="item.video_url"
+        :alt="item.title"
+        :controls="(item.media_type || 'image') === 'video'"
+        wrapper-class="news-media-wrap"
+        element-class="news-media"
+      />
     </div>
     <div class="news-content">
       <p class="news-date">{{ formatDate(item.published_at) }}</p>
@@ -12,12 +20,18 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
+
+import MediaAsset from "./MediaAsset.vue";
+
 const props = defineProps({
   item: {
     type: Object,
     required: true,
   },
 });
+
+const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
 
 const formatDate = (value) => {
   if (!value) return "";
@@ -39,10 +53,10 @@ const formatDate = (value) => {
   overflow: hidden;
 }
 
-.news-image img {
+.news-media-wrap,
+.news-media {
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .news-content {

@@ -1,0 +1,64 @@
+﻿from sqlalchemy import inspect, text
+
+
+COLUMN_DEFINITIONS = {
+    "hero_banners": {
+        "media_type": "VARCHAR(20)",
+        "video_url": "VARCHAR(500)",
+        "title_font_size": "INTEGER",
+        "subtitle_font_size": "INTEGER",
+        "description_font_size": "INTEGER",
+        "text_position": "VARCHAR(40)",
+    },
+    "site_sections": {
+        "media_type": "VARCHAR(20)",
+        "video_url": "VARCHAR(500)",
+    },
+    "products": {
+        "media_type": "VARCHAR(20)",
+        "video_url": "VARCHAR(500)",
+    },
+    "news_articles": {
+        "media_type": "VARCHAR(20)",
+        "video_url": "VARCHAR(500)",
+    },
+}
+
+
+def relax_legacy_constraints(connection) -> None:
+    dialect = connection.dialect.name
+    if dialect == "mysql":
+        connection.execute(text("ALTER TABLE hero_banners MODIFY COLUMN image_url VARCHAR(500) NULL"))
+    elif dialect == "postgresql":
+        connection.execute(text("ALTER TABLE hero_banners ALTER COLUMN image_url DROP NOT NULL"))
+
+
+def ensure_legacy_columns(engine) -> None:
+    """Add new columns and backfill defaults for legacy deployments without migrations."""
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table_name, columns in COLUMN_DEFINITIONS.items():
+            existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+            for column_name, column_type in columns.items():
+                if column_name in existing_columns:
+                    continue
+                connection.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"))
+
+        relax_legacy_constraints(connection)
+
+        connection.execute(
+            text(
+                """
+                UPDATE hero_banners
+                SET
+                    media_type = COALESCE(media_type, 'image'),
+                    title_font_size = COALESCE(title_font_size, 72),
+                    subtitle_font_size = COALESCE(subtitle_font_size, 13),
+                    description_font_size = COALESCE(description_font_size, 17),
+                    text_position = COALESCE(text_position, 'left-center')
+                """
+            )
+        )
+        connection.execute(text("UPDATE site_sections SET media_type = COALESCE(media_type, 'image')"))
+        connection.execute(text("UPDATE products SET media_type = COALESCE(media_type, 'image')"))
+        connection.execute(text("UPDATE news_articles SET media_type = COALESCE(media_type, 'image')"))
