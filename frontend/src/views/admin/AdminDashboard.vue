@@ -47,14 +47,15 @@
 
         <el-tab-pane label="版块管理" name="sections">
           <section class="panel-toolbar">
-            <span>管理首页文化版块、介绍内容及其配套媒体素材。</span>
+            <span>管理首页文化版块、摘要、详情正文及其配套媒体素材。</span>
             <el-button type="primary" @click="openSectionDialog()">新增版块</el-button>
           </section>
           <el-table :data="sectionState.items" v-loading="sectionState.loading">
             <el-table-column prop="sort_order" label="排序" width="90" />
             <el-table-column prop="name" label="名称" width="150" />
-            <el-table-column prop="key" label="标识" width="140" />
+            <el-table-column prop="key" label="标识" width="160" />
             <el-table-column prop="title" label="标题" min-width="220" />
+            <el-table-column prop="summary" label="摘要" min-width="220" show-overflow-tooltip />
             <el-table-column label="媒体" width="100">
               <template #default="scope">{{ resolveMediaType(scope.row.media_type) }}</template>
             </el-table-column>
@@ -141,38 +142,62 @@
 
         <el-tab-pane label="站点设置" name="site-settings">
           <section class="panel-toolbar">
-            <span>管理首页底部二维码区域和备案信息区域。</span>
+            <span>管理首页底部多二维码区域和备案信息区域。</span>
             <el-button type="primary" :loading="footerSettingsState.saving" @click="submitFooterSettings">保存设置</el-button>
           </section>
 
           <div class="site-setting-panel" v-loading="footerSettingsState.loading">
             <el-row :gutter="22">
-              <el-col :lg="12" :md="24">
+              <el-col :lg="14" :md="24">
                 <section class="site-card surface-card">
-                  <div class="site-card-header">
-                    <h3>二维码区域</h3>
-                    <el-switch v-model="footerSettingsState.form.qr_is_active" />
+                  <div class="site-card-header qr-header">
+                    <div>
+                      <h3>二维码区域</h3>
+                      <p>支持新增、删除、排序多个二维码，前端将按顺序展示。</p>
+                    </div>
+                    <el-button type="primary" plain @click="addQrCode">新增二维码</el-button>
                   </div>
-                  <MediaField
-                    :mode="'image'"
-                    :allow-video="false"
-                    label="二维码图片"
-                    v-model:image-url="footerSettingsState.form.qr_image_url"
-                    image-placeholder="支持输入图片链接，或上传本地图片"
-                    image-tip="首页底部将直接渲染这里保存的二维码图片。"
-                  />
-                  <el-form label-position="top" :model="footerSettingsState.form">
-                    <el-form-item label="二维码标题">
-                      <el-input v-model="footerSettingsState.form.qr_name" />
-                    </el-form-item>
-                    <el-form-item label="二维码说明">
-                      <el-input v-model="footerSettingsState.form.qr_description" maxlength="255" show-word-limit />
-                    </el-form-item>
-                  </el-form>
+
+                  <div v-if="footerSettingsState.form.qr_codes.length" class="qr-code-list">
+                    <article v-for="(item, index) in footerSettingsState.form.qr_codes" :key="item.id || `qr-${index}`" class="qr-code-card surface-card">
+                      <div class="qr-card-head">
+                        <div>
+                          <strong>二维码 {{ index + 1 }}</strong>
+                          <span>展示顺序 {{ index + 1 }}</span>
+                        </div>
+                        <div class="qr-card-actions">
+                          <el-switch v-model="item.is_active" />
+                          <el-button size="small" :disabled="index === 0" @click="moveQrCode(index, -1)">上移</el-button>
+                          <el-button size="small" :disabled="index === footerSettingsState.form.qr_codes.length - 1" @click="moveQrCode(index, 1)">下移</el-button>
+                          <el-button size="small" type="danger" plain @click="removeQrCode(index)">删除</el-button>
+                        </div>
+                      </div>
+
+                      <MediaField
+                        :mode="'image'"
+                        :allow-video="false"
+                        label="二维码图片"
+                        v-model:image-url="item.image_url"
+                        image-placeholder="支持输入图片链接，或上传本地图片"
+                        image-tip="页脚二维码将直接渲染这里保存的图片。"
+                      />
+
+                      <el-form label-position="top" :model="item">
+                        <el-form-item label="二维码标题">
+                          <el-input v-model="item.name" placeholder="例如：企业微信 / 公众号" />
+                        </el-form-item>
+                        <el-form-item label="二维码说明">
+                          <el-input v-model="item.description" type="textarea" :rows="3" maxlength="255" show-word-limit />
+                        </el-form-item>
+                      </el-form>
+                    </article>
+                  </div>
+
+                  <el-empty v-else description="暂未配置二维码，点击右上角新增。" />
                 </section>
               </el-col>
 
-              <el-col :lg="12" :md="24">
+              <el-col :lg="10" :md="24">
                 <section class="site-card surface-card">
                   <div class="site-card-header">
                     <h3>备案区域</h3>
@@ -243,7 +268,12 @@
         </div>
         <el-row :gutter="16">
           <el-col :md="12"><el-form-item label="按钮文案"><el-input v-model="bannerDialog.form.cta_text" /></el-form-item></el-col>
-          <el-col :md="12"><el-form-item label="按钮链接"><el-input v-model="bannerDialog.form.cta_link" /></el-form-item></el-col>
+          <el-col :md="12">
+            <el-form-item label="按钮链接">
+              <el-input v-model="bannerDialog.form.cta_link" placeholder="core_selling / #brand_story / https://example.com" />
+              <div class="field-tip">支持填写板块标识或带 # 的锚点，点击后会平滑滚动到首页对应板块；填写完整 URL 时保持原跳转逻辑。</div>
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-row :gutter="16">
           <el-col :md="12"><el-form-item label="排序"><el-input-number v-model="bannerDialog.form.sort_order" :min="0" /></el-form-item></el-col>
@@ -256,7 +286,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="sectionDialog.visible" :title="sectionDialog.form.id ? '编辑版块' : '新增版块'" width="820px">
+    <el-dialog v-model="sectionDialog.visible" :title="sectionDialog.form.id ? '编辑版块' : '新增版块'" width="1040px">
       <el-form label-position="top" :model="sectionDialog.form">
         <el-row :gutter="16">
           <el-col :md="12"><el-form-item label="版块名称"><el-input v-model="sectionDialog.form.name" /></el-form-item></el-col>
@@ -266,7 +296,12 @@
           <el-col :md="12"><el-form-item label="标题"><el-input v-model="sectionDialog.form.title" /></el-form-item></el-col>
           <el-col :md="12"><el-form-item label="副标题"><el-input v-model="sectionDialog.form.subtitle" /></el-form-item></el-col>
         </el-row>
-        <el-form-item label="正文"><el-input v-model="sectionDialog.form.body" type="textarea" :rows="5" /></el-form-item>
+        <el-form-item label="摘要">
+          <el-input v-model="sectionDialog.form.summary" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="用于首页板块中的简短展示。" />
+        </el-form-item>
+        <el-form-item label="正文">
+          <RichTextEditor v-model="sectionDialog.form.body" placeholder="支持段落、标题、加粗、列表、链接、图片等内容编辑。" />
+        </el-form-item>
         <MediaField label="版块媒体" v-model:mode="sectionDialog.form.media_type" v-model:image-url="sectionDialog.form.image_url" v-model:video-url="sectionDialog.form.video_url" />
         <el-form-item label="扩展 JSON"><el-input v-model="sectionDialog.form.extra_json" type="textarea" :rows="5" placeholder='{"tags": ["eco"], "stats": [{"label": "Altitude", "value": "1400m+"}]}' /></el-form-item>
         <el-row :gutter="16">
@@ -326,6 +361,7 @@ import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
 import MediaField from "../../components/admin/MediaField.vue";
+import RichTextEditor from "../../components/admin/RichTextEditor.vue";
 import {
   createBanner,
   createNews,
@@ -406,6 +442,7 @@ const createSectionForm = () => ({
   name: "",
   title: "",
   subtitle: "",
+  summary: "",
   body: "",
   image_url: "",
   media_type: "image",
@@ -438,17 +475,23 @@ const createNewsForm = () => ({
   sort_order: 0,
   is_active: true,
 });
+const createQrCodeForm = () => ({
+  id: null,
+  name: "",
+  description: "",
+  image_url: "",
+  sort_order: 0,
+  is_active: true,
+});
 const createFooterSettingsForm = () => ({
-  qr_name: "底部二维码",
-  qr_description: "扫码关注",
-  qr_image_url: "",
-  qr_is_active: true,
+  qr_codes: [],
   filing_name: "备案信息",
   filing_text: "",
   filing_is_active: true,
 });
 
 const normalizeMediaMode = (row) => row?.media_type || (row?.video_url ? "video" : "image");
+const normalizeSectionKey = (value) => String(value || "").trim().replace(/^#/, "");
 const bannerDialog = reactive({ visible: false, submitting: false, form: createBannerForm() });
 const sectionDialog = reactive({ visible: false, submitting: false, form: createSectionForm() });
 const productDialog = reactive({ visible: false, submitting: false, form: createProductForm() });
@@ -466,6 +509,32 @@ const getPositionLabel = (value) => positionOptions.find((item) => item.value ==
 const resolveContentType = (type) => ({ banner: "轮播图", section: "版块", product: "产品", news: "动态" }[type] || "内容");
 const applyBannerSizePreset = (field, value) => {
   bannerDialog.form[field] = value;
+};
+
+const reindexQrCodes = () => {
+  footerSettingsState.form.qr_codes.forEach((item, index) => {
+    item.sort_order = index;
+  });
+};
+
+const addQrCode = () => {
+  footerSettingsState.form.qr_codes.push(createQrCodeForm());
+  reindexQrCodes();
+};
+
+const removeQrCode = (index) => {
+  footerSettingsState.form.qr_codes.splice(index, 1);
+  reindexQrCodes();
+};
+
+const moveQrCode = (index, delta) => {
+  const targetIndex = index + delta;
+  if (targetIndex < 0 || targetIndex >= footerSettingsState.form.qr_codes.length) {
+    return;
+  }
+  const [current] = footerSettingsState.form.qr_codes.splice(index, 1);
+  footerSettingsState.form.qr_codes.splice(targetIndex, 0, current);
+  reindexQrCodes();
 };
 
 const loadBanners = async (page = bannerState.page) => {
@@ -509,24 +578,30 @@ const loadFooterSettings = async () => {
   try {
     const data = await fetchFooterSettings();
     footerSettingsState.form = {
-      qr_name: data.footer_qr?.name || "底部二维码",
-      qr_description: data.footer_qr?.description || "",
-      qr_image_url: data.footer_qr?.image_url || "",
-      qr_is_active: data.footer_qr?.is_active ?? true,
+      qr_codes: (data.footer_qr_codes || []).map((item, index) => ({
+        ...createQrCodeForm(),
+        ...item,
+        sort_order: item?.sort_order ?? index,
+      })),
       filing_name: data.footer_filing?.name || "备案信息",
       filing_text: data.footer_filing?.description || "",
       filing_is_active: data.footer_filing?.is_active ?? true,
     };
+    reindexQrCodes();
   } finally {
     footerSettingsState.loading = false;
   }
 };
 
 const buildFooterSettingsPayload = () => ({
-  qr_name: footerSettingsState.form.qr_name || null,
-  qr_description: footerSettingsState.form.qr_description || "",
-  qr_image_url: footerSettingsState.form.qr_image_url || null,
-  qr_is_active: Boolean(footerSettingsState.form.qr_is_active),
+  qr_codes: footerSettingsState.form.qr_codes.map((item, index) => ({
+    id: item.id || null,
+    name: item.name || null,
+    description: item.description || "",
+    image_url: item.image_url || null,
+    sort_order: index,
+    is_active: Boolean(item.is_active),
+  })),
   filing_name: footerSettingsState.form.filing_name || null,
   filing_text: footerSettingsState.form.filing_text || "",
   filing_is_active: Boolean(footerSettingsState.form.filing_is_active),
@@ -549,6 +624,7 @@ const openSectionDialog = (row = null) => {
   sectionDialog.form = {
     ...createSectionForm(),
     ...(row || {}),
+    key: normalizeSectionKey(row?.key || ""),
     media_type: normalizeMediaMode(row),
   };
   sectionDialog.visible = true;
@@ -576,7 +652,10 @@ const openNewsDialog = (row = null) => {
 const submitBanner = async () => {
   bannerDialog.submitting = true;
   try {
-    const payload = { ...bannerDialog.form };
+    const payload = {
+      ...bannerDialog.form,
+      cta_link: bannerDialog.form.cta_link?.trim() || "",
+    };
     if (payload.media_type === "video") {
       payload.image_url = null;
     } else {
@@ -600,7 +679,12 @@ const submitBanner = async () => {
 const submitSection = async () => {
   sectionDialog.submitting = true;
   try {
-    const payload = { ...sectionDialog.form };
+    const payload = {
+      ...sectionDialog.form,
+      key: normalizeSectionKey(sectionDialog.form.key),
+      summary: sectionDialog.form.summary?.trim() || "",
+      body: sectionDialog.form.body || "",
+    };
     if (payload.media_type === "video") {
       payload.image_url = null;
     } else {
@@ -644,6 +728,7 @@ const submitProduct = async () => {
     productDialog.submitting = false;
   }
 };
+
 const submitNews = async () => {
   newsDialog.submitting = true;
   try {
@@ -815,6 +900,52 @@ onMounted(refreshAll);
   color: var(--color-primary-deep);
 }
 
+.site-card-header p {
+  margin: 6px 0 0;
+  color: var(--color-text-soft);
+  line-height: 1.6;
+}
+
+.qr-header {
+  align-items: flex-start;
+}
+
+.qr-code-list {
+  display: grid;
+  gap: 16px;
+}
+
+.qr-code-card {
+  padding: 18px;
+  border-radius: 20px;
+}
+
+.qr-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.qr-card-head strong,
+.qr-card-head span {
+  display: block;
+}
+
+.qr-card-head span {
+  margin-top: 4px;
+  color: var(--color-text-soft);
+  font-size: 13px;
+}
+
+.qr-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .filing-preview {
   margin-top: 16px;
   padding: 18px;
@@ -854,9 +985,18 @@ onMounted(refreshAll);
   margin-top: 12px;
 }
 
+.field-tip {
+  margin-top: 8px;
+  color: var(--color-text-soft);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
 @media (max-width: 960px) {
   .dashboard-header,
-  .panel-toolbar {
+  .panel-toolbar,
+  .site-card-header,
+  .qr-card-head {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -880,5 +1020,3 @@ onMounted(refreshAll);
   }
 }
 </style>
-
-

@@ -13,6 +13,7 @@ class SectionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
     title: str = Field(..., min_length=1, max_length=200)
     subtitle: Optional[str] = Field(None, max_length=255)
+    summary: Optional[str] = Field(None, max_length=500)
     body: Optional[str] = None
     image_url: Optional[str] = Field(None, max_length=500)
     media_type: MediaType = "image"

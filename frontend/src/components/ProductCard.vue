@@ -1,12 +1,12 @@
-<template>
-  <article class="product-card surface-card">
+﻿<template>
+  <button class="product-card surface-card" type="button" @click="openDetail">
     <div v-if="hasMedia" class="product-image">
       <MediaAsset
         :media-type="item.media_type || 'image'"
         :image-url="item.cover_image"
         :video-url="item.video_url"
         :alt="item.name"
-        :controls="(item.media_type || 'image') === 'video'"
+        :controls="false"
         wrapper-class="product-media-wrap"
         element-class="product-media"
       />
@@ -22,11 +22,12 @@
         </div>
       </dl>
     </div>
-  </article>
+  </button>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 
 import MediaAsset from "./MediaAsset.vue";
 
@@ -37,6 +38,7 @@ const props = defineProps({
   },
 });
 
+const router = useRouter();
 const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
 
 const specList = computed(() => {
@@ -47,11 +49,20 @@ const specList = computed(() => {
     return [];
   }
 });
+
+const openDetail = async () => {
+  await router.push({ name: "product-detail", params: { id: props.item.id } });
+};
 </script>
 
 <style scoped>
 .product-card {
+  width: 100%;
   overflow: hidden;
+  padding: 0;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
 }
 
 .product-image {

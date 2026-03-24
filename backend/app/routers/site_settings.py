@@ -1,5 +1,6 @@
 ﻿from pathlib import Path
 import shutil
+from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.deps import get_current_admin
+from backend.app.models.footer_qr_code import FooterQRCode
 from backend.app.models.site_setting import SiteSetting
 from backend.app.models.user import AdminUser
 from backend.app.schemas.site_setting import FooterSettingsRead, FooterSettingsUpdate, SiteSettingRead, UploadResponse
@@ -14,18 +16,18 @@ from backend.app.schemas.site_setting import FooterSettingsRead, FooterSettingsU
 
 router = APIRouter(prefix="/site-settings", tags=["site-settings"])
 
-FOOTER_QR_KEY = "footer_qr"
+LEGACY_FOOTER_QR_KEY = "footer_qr"
 FOOTER_FILING_KEY = "footer_filing"
 DEFAULT_FOOTER_QR = {
-    "key": FOOTER_QR_KEY,
-    "name": "\u626b\u7801\u5173\u6ce8\u6211\u4eec",
-    "description": "\u83b7\u53d6\u6700\u65b0\u7ea2\u6cb3\u6587\u5316\u4fe1\u606f",
+    "key": LEGACY_FOOTER_QR_KEY,
+    "name": "扫码关注我们",
+    "description": "获取最新红河文化信息",
     "image_url": None,
     "is_active": True,
 }
 DEFAULT_FOOTER_FILING = {
     "key": FOOTER_FILING_KEY,
-    "name": "\u5907\u6848\u4fe1\u606f",
+    "name": "备案信息",
     "description": "",
     "image_url": None,
     "is_active": True,
@@ -62,11 +64,83 @@ def get_or_create_setting(db: Session, key: str, defaults: dict) -> SiteSetting:
 
 
 def get_footer_qr_setting(db: Session) -> SiteSetting:
-    return get_or_create_setting(db, FOOTER_QR_KEY, DEFAULT_FOOTER_QR)
+    return get_or_create_setting(db, LEGACY_FOOTER_QR_KEY, DEFAULT_FOOTER_QR)
 
 
 def get_footer_filing_setting(db: Session) -> SiteSetting:
     return get_or_create_setting(db, FOOTER_FILING_KEY, DEFAULT_FOOTER_FILING)
+
+
+def build_legacy_qr_code(db: Session):
+    legacy_qr = get_footer_qr_setting(db)
+    if not any([legacy_qr.name, legacy_qr.description, legacy_qr.image_url]):
+        return None
+
+    return SimpleNamespace(
+        id=0,
+        name=legacy_qr.name,
+        description=legacy_qr.description,
+        image_url=legacy_qr.image_url,
+        sort_order=0,
+        is_active=legacy_qr.is_active,
+        created_at=legacy_qr.created_at,
+        updated_at=legacy_qr.updated_at,
+    )
+
+
+def list_footer_qr_codes_for_admin(db: Session):
+    qr_codes = (
+        db.query(FooterQRCode)
+        .order_by(FooterQRCode.sort_order.asc(), FooterQRCode.created_at.desc())
+        .all()
+    )
+    if qr_codes:
+        return qr_codes
+
+    legacy_qr = build_legacy_qr_code(db)
+    return [legacy_qr] if legacy_qr else []
+
+
+def sync_footer_qr_codes(db: Session, payload_items):
+    existing_records = {record.id: record for record in db.query(FooterQRCode).all()}
+    persisted_records = []
+
+    for index, item in enumerate(payload_items):
+        record = existing_records.pop(item.id, None) if item.id else None
+        if record is None:
+            record = FooterQRCode()
+            db.add(record)
+
+        record.name = item.name
+        record.description = item.description
+        record.image_url = item.image_url
+        record.sort_order = item.sort_order if item.sort_order is not None else index
+        record.is_active = item.is_active
+        persisted_records.append(record)
+
+    for stale_record in existing_records.values():
+        db.delete(stale_record)
+
+    db.flush()
+    return sorted(persisted_records, key=lambda record: (record.sort_order, record.id or 0))
+
+
+def sync_legacy_footer_qr(db: Session, qr_codes):
+    legacy_qr = get_footer_qr_setting(db)
+    primary_qr = next((item for item in qr_codes if item.is_active and item.image_url), qr_codes[0] if qr_codes else None)
+
+    if primary_qr is None:
+        legacy_qr.name = DEFAULT_FOOTER_QR["name"]
+        legacy_qr.description = ""
+        legacy_qr.image_url = None
+        legacy_qr.is_active = False
+        return legacy_qr
+
+    legacy_qr.name = primary_qr.name or DEFAULT_FOOTER_QR["name"]
+    legacy_qr.description = primary_qr.description
+    legacy_qr.image_url = primary_qr.image_url
+    legacy_qr.is_active = primary_qr.is_active
+    return legacy_qr
 
 
 def save_media_file(file: UploadFile, media_type: str) -> UploadResponse:
@@ -104,7 +178,7 @@ def get_footer_settings(
     _: AdminUser = Depends(get_current_admin),
 ):
     return FooterSettingsRead(
-        footer_qr=SiteSettingRead.from_orm(get_footer_qr_setting(db)),
+        footer_qr_codes=list_footer_qr_codes_for_admin(db),
         footer_filing=SiteSettingRead.from_orm(get_footer_filing_setting(db)),
     )
 
@@ -115,25 +189,19 @@ def update_footer_settings(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
-    footer_qr = get_footer_qr_setting(db)
     footer_filing = get_footer_filing_setting(db)
-
-    footer_qr.name = payload.qr_name or DEFAULT_FOOTER_QR["name"]
-    footer_qr.description = payload.qr_description
-    footer_qr.image_url = payload.qr_image_url
-    footer_qr.is_active = payload.qr_is_active
-
     footer_filing.name = payload.filing_name or DEFAULT_FOOTER_FILING["name"]
     footer_filing.description = payload.filing_text
     footer_filing.is_active = payload.filing_is_active
 
+    qr_codes = sync_footer_qr_codes(db, payload.qr_codes)
+    sync_legacy_footer_qr(db, qr_codes)
+
     db.commit()
-    db.refresh(footer_qr)
-    db.refresh(footer_filing)
 
     return FooterSettingsRead(
-        footer_qr=SiteSettingRead.from_orm(footer_qr),
-        footer_filing=SiteSettingRead.from_orm(footer_filing),
+        footer_qr_codes=list_footer_qr_codes_for_admin(db),
+        footer_filing=SiteSettingRead.from_orm(get_footer_filing_setting(db)),
     )
 
 
@@ -156,3 +224,4 @@ def upload_site_setting_image(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file was selected")
     return save_media_file(file, "image")
+

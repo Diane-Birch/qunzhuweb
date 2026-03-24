@@ -1,8 +1,9 @@
-from typing import List, Optional
+﻿from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from backend.app.schemas.banner import BannerRead
+from backend.app.schemas.footer_qr_code import FooterQRCodeRead
 from backend.app.schemas.news import NewsRead
 from backend.app.schemas.product import ProductRead
 from backend.app.schemas.section import SectionRead
@@ -16,5 +17,5 @@ class HomePageResponse(BaseModel):
     news: List[NewsRead]
     product_intro: Optional[SectionRead] = None
     news_intro: Optional[SectionRead] = None
-    footer_qr: Optional[SiteSettingRead] = None
+    footer_qr_codes: List[FooterQRCodeRead] = Field(default_factory=list)
     footer_filing: Optional[SiteSettingRead] = None

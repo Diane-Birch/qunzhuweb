@@ -11,6 +11,7 @@ COLUMN_DEFINITIONS = {
         "text_position": "VARCHAR(40)",
     },
     "site_sections": {
+        "summary": "VARCHAR(500)",
         "media_type": "VARCHAR(20)",
         "video_url": "VARCHAR(500)",
     },
@@ -59,6 +60,15 @@ def ensure_legacy_columns(engine) -> None:
                 """
             )
         )
-        connection.execute(text("UPDATE site_sections SET media_type = COALESCE(media_type, 'image')"))
+        connection.execute(
+            text(
+                """
+                UPDATE site_sections
+                SET
+                    summary = COALESCE(summary, body),
+                    media_type = COALESCE(media_type, 'image')
+                """
+            )
+        )
         connection.execute(text("UPDATE products SET media_type = COALESCE(media_type, 'image')"))
         connection.execute(text("UPDATE news_articles SET media_type = COALESCE(media_type, 'image')"))

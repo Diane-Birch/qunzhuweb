@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+﻿from sqlalchemy import Column, Integer, String, Text
 
 from backend.app.models.base import BaseModel, SortableActiveMixin
 
@@ -13,6 +13,7 @@ class SiteSection(BaseModel, SortableActiveMixin):
     name = Column(String(120), nullable=False)
     title = Column(String(200), nullable=False)
     subtitle = Column(String(255), nullable=True)
+    summary = Column(String(500), nullable=True)
     body = Column(Text, nullable=True)
     image_url = Column(String(500), nullable=True)
     media_type = Column(String(20), nullable=True)

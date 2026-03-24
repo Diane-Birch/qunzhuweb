@@ -1,8 +1,9 @@
-from backend.app.models.banner import HeroBanner
+﻿from backend.app.models.banner import HeroBanner
+from backend.app.models.footer_qr_code import FooterQRCode
 from backend.app.models.news import NewsArticle
 from backend.app.models.product import Product
 from backend.app.models.section import SiteSection
 from backend.app.models.site_setting import SiteSetting
 from backend.app.models.user import AdminUser
 
-__all__ = ["AdminUser", "HeroBanner", "SiteSection", "Product", "NewsArticle", "SiteSetting"]
+__all__ = ["AdminUser", "HeroBanner", "SiteSection", "Product", "NewsArticle", "SiteSetting", "FooterQRCode"]

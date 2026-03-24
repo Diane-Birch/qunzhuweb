@@ -1,12 +1,12 @@
-<template>
-  <article class="news-card surface-card">
+﻿<template>
+  <button class="news-card surface-card" type="button" @click="openDetail">
     <div v-if="hasMedia" class="news-image">
       <MediaAsset
         :media-type="item.media_type || 'image'"
         :image-url="item.cover_image"
         :video-url="item.video_url"
         :alt="item.title"
-        :controls="(item.media_type || 'image') === 'video'"
+        :controls="false"
         wrapper-class="news-media-wrap"
         element-class="news-media"
       />
@@ -16,11 +16,12 @@
       <h3>{{ item.title }}</h3>
       <p v-if="item.summary" class="news-summary">{{ item.summary }}</p>
     </div>
-  </article>
+  </button>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 
 import MediaAsset from "./MediaAsset.vue";
 
@@ -31,6 +32,7 @@ const props = defineProps({
   },
 });
 
+const router = useRouter();
 const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
 
 const formatDate = (value) => {
@@ -41,11 +43,20 @@ const formatDate = (value) => {
     day: "2-digit",
   }).format(new Date(value));
 };
+
+const openDetail = async () => {
+  await router.push({ name: "news-detail", params: { id: props.item.id } });
+};
 </script>
 
 <style scoped>
 .news-card {
+  width: 100%;
   overflow: hidden;
+  padding: 0;
+  text-align: left;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
 }
 
 .news-image {

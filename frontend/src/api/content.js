@@ -1,7 +1,22 @@
-import http from "./http";
+﻿import http from "./http";
 
 export const fetchHomepage = async () => {
   const { data } = await http.get("/public/home");
+  return data;
+};
+
+export const fetchSectionDetail = async (sectionKey) => {
+  const { data } = await http.get(`/public/sections/${sectionKey}`);
+  return data;
+};
+
+export const fetchProductDetail = async (productId) => {
+  const { data } = await http.get(`/public/products/${productId}`);
+  return data;
+};
+
+export const fetchNewsDetail = async (newsId) => {
+  const { data } = await http.get(`/public/news/${newsId}`);
   return data;
 };
 

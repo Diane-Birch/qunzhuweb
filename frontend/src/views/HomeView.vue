@@ -44,15 +44,23 @@
           <div v-else class="story-grid">
             <article
               v-for="section in homepage.sections"
+              :id="resolveSectionId(section.key)"
               :key="section.id"
               class="story-card surface-card"
             >
               <div class="story-copy">
-                <SectionHeading
-                  :title="section.title"
-                  :subtitle="section.subtitle"
-                  :description="section.body"
-                />
+                <p v-if="section.subtitle" class="story-subtitle">{{ section.subtitle }}</p>
+                <button class="story-title-button" type="button" @click="openSectionDetail(section.key)">
+                  {{ section.title }}
+                </button>
+                <button
+                  v-if="resolveSectionSummary(section)"
+                  class="story-summary-button"
+                  type="button"
+                  @click="openSectionDetail(section.key)"
+                >
+                  {{ resolveSectionSummary(section) }}
+                </button>
                 <div v-if="parseExtra(section.extra_json).tags.length" class="tag-list">
                   <span v-for="tag in parseExtra(section.extra_json).tags" :key="tag">{{ tag }}</span>
                 </div>
@@ -62,18 +70,24 @@
                     <span>{{ stat.label }}</span>
                   </div>
                 </div>
+                <button class="story-link-button" type="button" @click="openSectionDetail(section.key)">查看详情</button>
               </div>
-              <div v-if="hasSectionMedia(section)" class="story-image">
+              <button
+                v-if="hasSectionMedia(section)"
+                class="story-image-button"
+                type="button"
+                @click="openSectionDetail(section.key)"
+              >
                 <MediaAsset
                   :media-type="section.media_type || 'image'"
                   :image-url="section.image_url"
                   :video-url="section.video_url"
                   :alt="section.title"
-                  :controls="(section.media_type || 'image') === 'video'"
+                  :controls="false"
                   wrapper-class="story-media-wrap"
                   element-class="story-media"
                 />
-              </div>
+              </button>
             </article>
           </div>
         </div>
@@ -85,7 +99,7 @@
             v-if="homepage.product_intro"
             :title="homepage.product_intro.title"
             :subtitle="homepage.product_intro.subtitle"
-            :description="homepage.product_intro.body"
+            :description="homepage.product_intro.summary || homepage.product_intro.body"
           />
           <div class="product-grid">
             <ProductCard v-for="item in homepage.products" :key="item.id" :item="item" />
@@ -102,7 +116,7 @@
             v-if="homepage.news_intro"
             :title="homepage.news_intro.title"
             :subtitle="homepage.news_intro.subtitle"
-            :description="homepage.news_intro.body"
+            :description="homepage.news_intro.summary || homepage.news_intro.body"
           />
           <div class="news-grid">
             <NewsCard v-for="item in homepage.news" :key="item.id" :item="item" />
@@ -131,24 +145,23 @@
 
       <div class="page-shell footer-shell">
         <section class="footer-panel surface-card" aria-label="Footer information">
-          <div v-if="showQrImage" class="footer-qr-stage">
-            <div class="footer-qr-frame">
-              <img
-                :src="homepage.footer_qr.image_url"
-                :alt="homepage.footer_qr.name || qrFallbackLabel"
-                class="footer-qr-image"
-              />
-            </div>
+          <div v-if="footerQrCodes.length" class="footer-qr-gallery">
+            <article v-for="item in footerQrCodes" :key="item.id || item.sort_order" class="footer-qr-card">
+              <div class="footer-qr-frame">
+                <img
+                  :src="item.image_url"
+                  :alt="item.name || qrFallbackLabel"
+                  class="footer-qr-image hover-scale-image"
+                />
+              </div>
+              <p v-if="item.name" class="footer-qr-name">{{ item.name }}</p>
+              <p v-if="item.description" class="footer-qr-description">{{ item.description }}</p>
+            </article>
           </div>
 
-          <div class="footer-copy">
-            <p v-if="homepage.footer_qr?.name" class="footer-eyebrow">{{ homepage.footer_qr.name }}</p>
-            <p v-if="showQrDescription" class="footer-description">{{ homepage.footer_qr.description }}</p>
-
-            <div v-if="showFilingInfo" class="footer-filing-block">
-              <span class="footer-filing-label">{{ homepage.footer_filing.name || filingFallbackLabel }}</span>
-              <p class="footer-filing-copy">{{ homepage.footer_filing.description }}</p>
-            </div>
+          <div v-if="showFilingInfo" class="footer-copy">
+            <span class="footer-filing-label">{{ homepage.footer_filing.name || filingFallbackLabel }}</span>
+            <p class="footer-filing-copy">{{ homepage.footer_filing.description }}</p>
           </div>
         </section>
       </div>
@@ -159,8 +172,8 @@
 <script setup>
 import { ArrowDown } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
-import { computed, onMounted, reactive, ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 import { fetchHomepage } from "../api/content";
 import HeroCarousel from "../components/HeroCarousel.vue";
@@ -168,16 +181,18 @@ import MediaAsset from "../components/MediaAsset.vue";
 import NewsCard from "../components/NewsCard.vue";
 import ProductCard from "../components/ProductCard.vue";
 import SectionHeading from "../components/SectionHeading.vue";
+import { normalizeSectionId, resolveSectionHash, scrollToHash } from "../utils/sectionNavigation";
 import logoImage from "../../logo/logo.png";
 
 const router = useRouter();
+const route = useRoute();
 const loading = ref(true);
-const siteTitle = "\u7ea2\u6cb3\u6587\u5316\u7ad9";
-const navMenuLabel = "\u5bfc\u822a\u83dc\u5355";
-const emptyProductText = "\u6682\u65e0\u4ea7\u54c1\u5185\u5bb9";
-const emptyNewsText = "\u6682\u65e0\u65b0\u95fb\u5185\u5bb9";
-const qrFallbackLabel = "\u626b\u7801\u5173\u6ce8";
-const filingFallbackLabel = "\u5907\u6848\u4fe1\u606f";
+const siteTitle = "红河文化站";
+const navMenuLabel = "导航菜单";
+const emptyProductText = "暂无产品内容";
+const emptyNewsText = "暂无新闻内容";
+const qrFallbackLabel = "扫码关注";
+const filingFallbackLabel = "备案信息";
 const homepage = reactive({
   banners: [],
   sections: [],
@@ -185,23 +200,26 @@ const homepage = reactive({
   news: [],
   product_intro: null,
   news_intro: null,
-  footer_qr: null,
+  footer_qr_codes: [],
   footer_filing: null,
 });
 
 const menuItems = [
-  { label: "\u6587\u5316\u4eae\u70b9", command: "#culture" },
-  { label: "\u4ea7\u54c1\u5c55\u793a", command: "#products" },
-  { label: "\u4f01\u4e1a\u52a8\u6001", command: "#news" },
-  { label: "\u540e\u53f0\u7ba1\u7406", command: "/admin/login" },
+  { label: "文化亮点", command: "#culture" },
+  { label: "产品展示", command: "#products" },
+  { label: "企业动态", command: "#news" },
+  { label: "后台管理", command: "/admin/login" },
 ];
 
-const showQrImage = computed(() => Boolean(homepage.footer_qr?.is_active && homepage.footer_qr?.image_url));
-const showQrDescription = computed(() => Boolean(homepage.footer_qr?.is_active && homepage.footer_qr?.description));
+const footerQrCodes = computed(() =>
+  (homepage.footer_qr_codes || []).filter((item) => item?.is_active && item?.image_url)
+);
 const showFilingInfo = computed(() => Boolean(homepage.footer_filing?.is_active && homepage.footer_filing?.description));
-const hasFooterContent = computed(() => showQrImage.value || showQrDescription.value || showFilingInfo.value);
+const hasFooterContent = computed(() => footerQrCodes.value.length > 0 || showFilingInfo.value);
 
 const hasSectionMedia = (section) => Boolean(section?.video_url || section?.image_url);
+const resolveSectionId = (value) => normalizeSectionId(value);
+const resolveSectionSummary = (section) => section?.summary || "";
 
 const parseExtra = (value) => {
   try {
@@ -215,10 +233,36 @@ const parseExtra = (value) => {
   }
 };
 
-const scrollToSection = (hash) => {
-  const target = document.querySelector(hash);
-  if (target) {
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+const navigateToHash = async (hash) => {
+  if (!hash) {
+    return;
+  }
+
+  try {
+    if (router.currentRoute.value.path !== "/" || router.currentRoute.value.hash !== hash) {
+      await router.push({ path: "/", hash });
+    }
+  } catch (error) {
+    // Ignore duplicate navigation errors.
+  }
+
+  await nextTick();
+  if (!scrollToHash(hash)) {
+    window.setTimeout(() => {
+      scrollToHash(hash);
+    }, 120);
+  }
+};
+
+const syncRouteHash = async () => {
+  if (route.path !== "/" || !route.hash) {
+    return;
+  }
+  await nextTick();
+  if (!scrollToHash(route.hash)) {
+    window.setTimeout(() => {
+      scrollToHash(route.hash);
+    }, 120);
   }
 };
 
@@ -236,17 +280,9 @@ const goHome = async () => {
 };
 
 const handleNavCommand = async (command) => {
-  if (command.startsWith("#")) {
-    try {
-      if (router.currentRoute.value.path !== "/" || router.currentRoute.value.hash !== command) {
-        await router.push({ path: "/", hash: command });
-        requestAnimationFrame(() => scrollToSection(command));
-      } else {
-        scrollToSection(command);
-      }
-    } catch (error) {
-      scrollToSection(command);
-    }
+  const hash = resolveSectionHash(command);
+  if (hash) {
+    await navigateToHash(hash);
     return;
   }
 
@@ -255,17 +291,29 @@ const handleNavCommand = async (command) => {
   }
 };
 
+const openSectionDetail = async (sectionKey) => {
+  await router.push({ name: "section-detail", params: { key: normalizeSectionId(sectionKey) } });
+};
+
 const loadHomepage = async () => {
   loading.value = true;
   try {
     const data = await fetchHomepage();
     Object.assign(homepage, data);
+    await syncRouteHash();
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || "\u9996\u9875\u6570\u636e\u52a0\u8f7d\u5931\u8d25");
+    ElMessage.error(error.response?.data?.detail || "首页数据加载失败");
   } finally {
     loading.value = false;
   }
 };
+
+watch(
+  () => route.hash,
+  () => {
+    syncRouteHash();
+  }
+);
 
 onMounted(loadHomepage);
 </script>
@@ -307,7 +355,11 @@ onMounted(loadHomepage);
 
 .brand-logo-button,
 .brand-title,
-.nav-trigger {
+.nav-trigger,
+.story-title-button,
+.story-summary-button,
+.story-link-button,
+.story-image-button {
   border: none;
   background: transparent;
   padding: 0;
@@ -381,16 +433,62 @@ onMounted(loadHomepage);
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: flex-start;
 }
 
-.story-image {
+.story-subtitle {
+  margin: 0 0 14px;
+  color: var(--color-secondary);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+.story-title-button {
+  text-align: left;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 4vw, 46px);
+  color: var(--color-primary-deep);
+  transition: color 0.24s ease;
+}
+
+.story-title-button:hover,
+.story-summary-button:hover {
+  color: var(--color-primary);
+}
+
+.story-summary-button {
+  margin-top: 16px;
+  text-align: left;
+  color: var(--color-text-soft);
+  line-height: 1.85;
+  font-size: 16px;
+}
+
+.story-link-button {
+  margin-top: 24px;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(141, 79, 42, 0.12);
+  color: var(--color-primary-deep);
+  font-weight: 600;
+  transition: transform 0.24s ease, background-color 0.24s ease;
+}
+
+.story-link-button:hover {
+  background: rgba(141, 79, 42, 0.2);
+  transform: translateY(-1px);
+}
+
+.story-image-button {
   overflow: hidden;
   border-radius: 24px;
   min-height: 320px;
 }
 
 .story-media-wrap,
-.story-media {
+.story-media,
+.story-image-button {
   width: 100%;
   height: 100%;
 }
@@ -403,7 +501,7 @@ onMounted(loadHomepage);
 }
 
 .tag-list {
-  margin-top: 4px;
+  margin-top: 18px;
 }
 
 .tag-list span {
@@ -548,9 +646,8 @@ onMounted(loadHomepage);
 
 .footer-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
-  align-items: center;
-  gap: 30px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 28px;
   padding: 28px 32px;
   border-radius: 30px;
   background:
@@ -558,12 +655,21 @@ onMounted(loadHomepage);
     linear-gradient(180deg, rgba(222, 210, 189, 0.24), rgba(247, 240, 228, 0));
 }
 
-.footer-qr-stage {
+.footer-qr-gallery {
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.footer-qr-card {
+  width: min(100%, 180px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .footer-qr-frame {
+  overflow: hidden;
   padding: 16px;
   border-radius: 28px;
   background: rgba(255, 250, 242, 0.92);
@@ -571,40 +677,30 @@ onMounted(loadHomepage);
 }
 
 .footer-qr-image {
-  width: 150px;
-  height: 150px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
   object-fit: contain;
+}
+
+.footer-qr-name {
+  margin: 0;
+  color: var(--color-primary-deep);
+  font-weight: 600;
+}
+
+.footer-qr-description {
+  margin: 0;
+  color: var(--color-text-soft);
+  line-height: 1.7;
 }
 
 .footer-copy {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
-.footer-eyebrow {
-  margin: 0;
-  color: var(--color-secondary);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.footer-description {
-  margin: 0;
-  font-size: clamp(18px, 2.1vw, 24px);
-  line-height: 1.7;
-  color: var(--color-primary-deep);
-}
-
-.footer-filing-block {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 8px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 14px 18px;
-  border-radius: 18px;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 22px;
   background: rgba(110, 134, 97, 0.09);
 }
 
@@ -617,7 +713,7 @@ onMounted(loadHomepage);
 .footer-filing-copy {
   margin: 0;
   color: var(--color-text-soft);
-  line-height: 1.7;
+  line-height: 1.8;
   word-break: break-all;
 }
 
@@ -658,10 +754,6 @@ onMounted(loadHomepage);
   .footer-panel {
     grid-template-columns: 1fr;
   }
-
-  .footer-qr-stage {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 768px) {
@@ -687,8 +779,12 @@ onMounted(loadHomepage);
     padding: 18px;
   }
 
-  .story-image {
+  .story-image-button {
     min-height: 220px;
+  }
+
+  .story-title-button {
+    font-size: 32px;
   }
 
   .transition-ridge {
@@ -710,9 +806,8 @@ onMounted(loadHomepage);
     padding: 22px 18px;
   }
 
-  .footer-qr-image {
-    width: 120px;
-    height: 120px;
+  .footer-qr-card {
+    width: min(100%, 160px);
   }
 }
 </style>
