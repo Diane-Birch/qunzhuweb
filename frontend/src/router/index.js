@@ -1,5 +1,6 @@
-﻿import { createRouter, createWebHistory } from "vue-router";
+import { createRouter, createWebHistory } from "vue-router";
 
+import ContentArchiveView from "../views/ContentArchiveView.vue";
 import HomeView from "../views/HomeView.vue";
 import NewsDetailView from "../views/NewsDetailView.vue";
 import ProductDetailView from "../views/ProductDetailView.vue";
@@ -17,16 +18,34 @@ const router = createRouter({
       component: HomeView,
     },
     {
+      path: "/sections/board/:groupKey",
+      name: "section-archive",
+      component: ContentArchiveView,
+      props: (route) => ({ contentType: "section", groupKey: route.params.groupKey }),
+    },
+    {
       path: "/sections/:key",
       name: "section-detail",
       component: SectionDetailView,
       props: true,
     },
     {
+      path: "/products",
+      name: "product-archive",
+      component: ContentArchiveView,
+      props: { contentType: "product" },
+    },
+    {
       path: "/products/:id",
       name: "product-detail",
       component: ProductDetailView,
       props: true,
+    },
+    {
+      path: "/news",
+      name: "news-archive",
+      component: ContentArchiveView,
+      props: { contentType: "news" },
     },
     {
       path: "/news/:id",

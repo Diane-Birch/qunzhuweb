@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="section-detail-page section-space">
     <div class="page-shell">
       <div v-if="loading" class="surface-card detail-loading">
@@ -6,7 +6,7 @@
       </div>
 
       <div v-else-if="section" class="detail-layout">
-        <button class="detail-back" type="button" @click="goBackHome">返回首页</button>
+        <button class="detail-back" type="button" @click="goBack">{{ backLabel }}</button>
 
         <article class="surface-card detail-article">
           <SectionHeading :title="section.title" :subtitle="section.subtitle" :description="section.summary" />
@@ -40,7 +40,7 @@
       </div>
 
       <div v-else class="surface-card detail-empty">
-        <el-empty description="未找到该板块内容" />
+        <el-empty description="&#x672A;&#x627E;&#x5230;&#x8BE5;&#x677F;&#x5757;&#x5185;&#x5BB9;" />
       </div>
     </div>
   </div>
@@ -64,6 +64,8 @@ const section = ref(null);
 
 const hasMedia = computed(() => Boolean(section.value?.image_url || section.value?.video_url));
 const sanitizedBody = computed(() => sanitizeRichText(section.value?.body || ""));
+const backPath = computed(() => (typeof route.query.back === "string" ? route.query.back : ""));
+const backLabel = computed(() => (backPath.value ? "\u8fd4\u56de\u5217\u8868" : "\u8fd4\u56de\u9996\u9875"));
 const meta = computed(() => {
   try {
     const parsed = JSON.parse(section.value?.extra_json || "{}");
@@ -87,14 +89,18 @@ const loadSection = async (key) => {
     section.value = await fetchSectionDetail(key);
   } catch (error) {
     section.value = null;
-    ElMessage.error(error.response?.data?.detail || "板块详情加载失败");
+    ElMessage.error(error.response?.data?.detail || "\u677f\u5757\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25");
   } finally {
     loading.value = false;
   }
 };
 
-const goBackHome = async () => {
-  const hash = section.value?.key ? `#${normalizeSectionId(section.value.key)}` : "";
+const goBack = async () => {
+  if (backPath.value) {
+    await router.push(backPath.value);
+    return;
+  }
+  const hash = section.value?.group_key || section.value?.key ? `#${normalizeSectionId(section.value.group_key || section.value.key)}` : "";
   await router.push({ path: "/", hash });
 };
 

@@ -1,5 +1,6 @@
-﻿from types import SimpleNamespace
+from types import SimpleNamespace
 
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,17 +12,19 @@ from backend.app.models.news import NewsArticle
 from backend.app.models.product import Product
 from backend.app.models.section import SiteSection
 from backend.app.models.site_setting import SiteSetting
+from backend.app.schemas.common import PageResult
 from backend.app.schemas.news import NewsRead
 from backend.app.schemas.product import ProductRead
 from backend.app.schemas.public import HomePageResponse
-from backend.app.schemas.section import SectionRead
+from backend.app.schemas.section import SectionRead, normalize_section_key
 
 
 router = APIRouter(prefix="/public", tags=["public"])
 
 LEGACY_FOOTER_QR_KEY = "footer_qr"
 FOOTER_FILING_KEY = "footer_filing"
-EXCLUDED_SECTION_KEYS = ["product_intro", "news_intro"]
+HOMEPAGE_PRODUCT_LIMIT = 2
+HOMEPAGE_NEWS_LIMIT = 3
 
 
 def get_footer_qr_codes(db: Session):
@@ -60,6 +63,50 @@ def get_footer_qr_codes(db: Session):
     ]
 
 
+def build_public_section_key_filter(key: str):
+    normalized = normalize_section_key(key)
+    prefixed = f"#{normalized}"
+    return or_(
+        SiteSection.key == normalized,
+        SiteSection.key == prefixed,
+        func.trim(SiteSection.key) == normalized,
+        func.trim(SiteSection.key) == prefixed,
+    )
+
+
+def build_public_section_group_filter(group_key: str):
+    normalized = normalize_section_key(group_key)
+    prefixed = f"#{normalized}"
+    key_filter = or_(
+        SiteSection.key == normalized,
+        SiteSection.key == prefixed,
+        func.trim(SiteSection.key) == normalized,
+        func.trim(SiteSection.key) == prefixed,
+    )
+    return or_(
+        SiteSection.group_key == normalized,
+        SiteSection.group_key == prefixed,
+        func.trim(SiteSection.group_key) == normalized,
+        func.trim(SiteSection.group_key) == prefixed,
+        and_(SiteSection.group_key.is_(None), key_filter),
+    )
+
+
+def paginate_public_query(query, page: int, page_size: int):
+    total = query.count()
+    items = query.offset((page - 1) * page_size).limit(page_size).all()
+    return PageResult(total=total, page=page, page_size=page_size, items=items)
+
+
+def get_active_section_roots(db: Session):
+    return (
+        db.query(SiteSection)
+        .filter(SiteSection.is_active.is_(True), SiteSection.node_type == "section")
+        .order_by(SiteSection.sort_order.asc(), SiteSection.created_at.asc(), SiteSection.id.asc())
+        .all()
+    )
+
+
 @router.get("/home", response_model=HomePageResponse)
 def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
     """Aggregate all homepage content so the frontend can render from one request."""
@@ -69,46 +116,62 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
         .order_by(HeroBanner.sort_order.asc(), HeroBanner.created_at.desc())
         .all()
     )
+    roots = get_active_section_roots(db)
+    section_roots = [root for root in roots if root.content_source == "section"]
+    section_root_keys = [root.key for root in section_roots]
     sections = (
         db.query(SiteSection)
         .filter(
             SiteSection.is_active.is_(True),
-            SiteSection.key.notin_(EXCLUDED_SECTION_KEYS),
+            SiteSection.node_type == "content",
+            SiteSection.group_key.in_(section_root_keys or [""]),
         )
-        .order_by(SiteSection.sort_order.asc(), SiteSection.created_at.desc())
+        .order_by(SiteSection.created_at.desc(), SiteSection.id.desc())
         .all()
     )
     products = (
         db.query(Product)
         .filter(Product.is_active.is_(True))
-        .order_by(Product.sort_order.asc(), Product.created_at.desc())
+        .order_by(Product.created_at.desc(), Product.id.desc())
+        .limit(HOMEPAGE_PRODUCT_LIMIT)
         .all()
     )
     news = (
         db.query(NewsArticle)
         .filter(NewsArticle.is_active.is_(True))
-        .order_by(NewsArticle.sort_order.asc(), NewsArticle.published_at.desc())
+        .order_by(NewsArticle.published_at.desc(), NewsArticle.created_at.desc(), NewsArticle.id.desc())
+        .limit(HOMEPAGE_NEWS_LIMIT)
         .all()
     )
-    product_intro = (
-        db.query(SiteSection)
-        .filter(SiteSection.key == "product_intro", SiteSection.is_active.is_(True))
-        .first()
-    )
-    news_intro = (
-        db.query(SiteSection)
-        .filter(SiteSection.key == "news_intro", SiteSection.is_active.is_(True))
-        .first()
-    )
+    product_intro = next((root for root in roots if root.content_source == "product"), None)
+    news_intro = next((root for root in roots if root.content_source == "news"), None)
+    if product_intro is None:
+        product_intro = (
+            db.query(SiteSection)
+            .filter(SiteSection.key == "product_intro", SiteSection.is_active.is_(True))
+            .first()
+        )
+    if news_intro is None:
+        news_intro = (
+            db.query(SiteSection)
+            .filter(SiteSection.key == "news_intro", SiteSection.is_active.is_(True))
+            .first()
+        )
     footer_filing = (
         db.query(SiteSetting)
         .filter(SiteSetting.key == FOOTER_FILING_KEY, SiteSetting.is_active.is_(True))
         .first()
     )
+    latest_sections = {}
+    for section in sections:
+        group_key = normalize_section_key(section.group_key or section.key)
+        if group_key in latest_sections:
+            continue
+        latest_sections[group_key] = section
 
     return HomePageResponse(
         banners=banners,
-        sections=sections,
+        sections=[latest_sections[key] for key in section_root_keys if key in latest_sections],
         products=products,
         news=news,
         product_intro=product_intro,
@@ -118,16 +181,69 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
     )
 
 
+@router.get("/section-groups/{group_key}", response_model=PageResult[SectionRead])
+def list_public_section_group(
+    group_key: str,
+    page: int = 1,
+    page_size: int = 9,
+    db: Session = Depends(get_db),
+) -> PageResult[SectionRead]:
+    normalized_group_key = normalize_section_key(group_key)
+    root = (
+        db.query(SiteSection)
+        .filter(
+            SiteSection.node_type == "section",
+            SiteSection.content_source == "section",
+            build_public_section_key_filter(normalized_group_key),
+        )
+        .first()
+    )
+    if not root:
+        raise HTTPException(status_code=404, detail="Section group not found")
+
+    query = (
+        db.query(SiteSection)
+        .filter(
+            SiteSection.is_active.is_(True),
+            SiteSection.node_type == "content",
+            or_(
+                SiteSection.parent_id == root.id,
+                build_public_section_group_filter(normalized_group_key),
+            ),
+        )
+        .order_by(SiteSection.created_at.desc(), SiteSection.id.desc())
+    )
+    return paginate_public_query(query, page=page, page_size=page_size)
+
+
 @router.get("/sections/{section_key}", response_model=SectionRead)
 def get_public_section_detail(section_key: str, db: Session = Depends(get_db)) -> SectionRead:
     section = (
         db.query(SiteSection)
-        .filter(SiteSection.key == section_key, SiteSection.is_active.is_(True))
+        .filter(
+            build_public_section_key_filter(section_key),
+            SiteSection.is_active.is_(True),
+            SiteSection.node_type == "content",
+        )
         .first()
     )
     if not section:
         raise HTTPException(status_code=404, detail="Section not found")
     return section
+
+
+@router.get("/products", response_model=PageResult[ProductRead])
+def list_public_products(
+    page: int = 1,
+    page_size: int = 9,
+    db: Session = Depends(get_db),
+) -> PageResult[ProductRead]:
+    query = (
+        db.query(Product)
+        .filter(Product.is_active.is_(True))
+        .order_by(Product.created_at.desc(), Product.id.desc())
+    )
+    return paginate_public_query(query, page=page, page_size=page_size)
 
 
 @router.get("/products/{product_id}", response_model=ProductRead)
@@ -140,6 +256,20 @@ def get_public_product_detail(product_id: int, db: Session = Depends(get_db)) ->
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
+
+
+@router.get("/news", response_model=PageResult[NewsRead])
+def list_public_news(
+    page: int = 1,
+    page_size: int = 9,
+    db: Session = Depends(get_db),
+) -> PageResult[NewsRead]:
+    query = (
+        db.query(NewsArticle)
+        .filter(NewsArticle.is_active.is_(True))
+        .order_by(NewsArticle.published_at.desc(), NewsArticle.created_at.desc(), NewsArticle.id.desc())
+    )
+    return paginate_public_query(query, page=page, page_size=page_size)
 
 
 @router.get("/news/{news_id}", response_model=NewsRead)

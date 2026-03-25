@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <button class="product-card surface-card" type="button" @click="openDetail">
     <div v-if="hasMedia" class="product-image">
       <MediaAsset
@@ -14,8 +14,8 @@
     <div class="product-content">
       <p v-if="item.subtitle" class="product-subtitle">{{ item.subtitle }}</p>
       <h3>{{ item.name }}</h3>
-      <p v-if="item.description" class="product-description">{{ item.description }}</p>
-      <dl v-if="specList.length" class="product-specs">
+      <p v-if="descriptionText" class="product-description">{{ descriptionText }}</p>
+      <dl v-if="showSpecs && specList.length" class="product-specs">
         <div v-for="spec in specList" :key="spec.label">
           <dt>{{ spec.label }}</dt>
           <dd>{{ spec.value }}</dd>
@@ -30,18 +30,31 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 
 import MediaAsset from "./MediaAsset.vue";
+import { richTextToPlainText } from "../utils/richText";
 
 const props = defineProps({
   item: {
     type: Object,
     required: true,
   },
+  detailQuery: {
+    type: Object,
+    default: () => ({}),
+  },
+  showSpecs: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const router = useRouter();
 const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
+const descriptionText = computed(() => richTextToPlainText(props.item.description || ""));
 
 const specList = computed(() => {
+  if (!props.showSpecs) {
+    return [];
+  }
   try {
     const raw = JSON.parse(props.item.specs_json || "{}");
     return Object.entries(raw).map(([label, value]) => ({ label, value }));
@@ -51,7 +64,7 @@ const specList = computed(() => {
 });
 
 const openDetail = async () => {
-  await router.push({ name: "product-detail", params: { id: props.item.id } });
+  await router.push({ name: "product-detail", params: { id: props.item.id }, query: props.detailQuery });
 };
 </script>
 
@@ -95,6 +108,10 @@ h3 {
   margin: 16px 0 0;
   color: var(--color-text-soft);
   line-height: 1.85;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .product-specs {

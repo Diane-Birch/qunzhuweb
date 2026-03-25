@@ -1,7 +1,12 @@
-﻿import http from "./http";
+import http from "./http";
 
 export const fetchHomepage = async () => {
   const { data } = await http.get("/public/home");
+  return data;
+};
+
+export const fetchPublicSectionGroup = async (groupKey, params) => {
+  const { data } = await http.get(`/public/section-groups/${groupKey}`, { params });
   return data;
 };
 
@@ -10,8 +15,18 @@ export const fetchSectionDetail = async (sectionKey) => {
   return data;
 };
 
+export const fetchPublicProducts = async (params) => {
+  const { data } = await http.get("/public/products", { params });
+  return data;
+};
+
 export const fetchProductDetail = async (productId) => {
   const { data } = await http.get(`/public/products/${productId}`);
+  return data;
+};
+
+export const fetchPublicNews = async (params) => {
+  const { data } = await http.get("/public/news", { params });
   return data;
 };
 
@@ -71,6 +86,26 @@ export const deleteBanner = async (id) => {
 
 export const fetchSections = async (params) => {
   const { data } = await http.get("/sections", { params });
+  return data;
+};
+
+export const fetchSectionRoots = async () => {
+  const { data } = await http.get("/sections/roots");
+  return data;
+};
+
+export const createSectionRoot = async (payload) => {
+  const { data } = await http.post("/sections/roots", payload);
+  return data;
+};
+
+export const updateSectionRoot = async (id, payload) => {
+  const { data } = await http.put(`/sections/roots/${id}`, payload);
+  return data;
+};
+
+export const deleteSectionRoot = async (id) => {
+  const { data } = await http.delete(`/sections/roots/${id}`);
   return data;
 };
 

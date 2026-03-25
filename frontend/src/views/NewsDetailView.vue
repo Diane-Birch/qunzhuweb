@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="detail-page section-space">
     <div class="page-shell">
       <div v-if="loading" class="surface-card detail-loading">
@@ -6,7 +6,7 @@
       </div>
 
       <div v-else-if="article" class="detail-layout">
-        <button class="detail-back" type="button" @click="goBackHome">返回动态区</button>
+        <button class="detail-back" type="button" @click="goBack">{{ backLabel }}</button>
 
         <article class="surface-card detail-article">
           <SectionHeading :title="article.title" :subtitle="formatDate(article.published_at)" :description="article.summary" />
@@ -23,12 +23,12 @@
             />
           </div>
 
-          <div class="detail-content">{{ article.content || article.summary }}</div>
+          <div class="rich-text-content" v-html="sanitizedContent || article.summary" />
         </article>
       </div>
 
       <div v-else class="surface-card detail-empty">
-        <el-empty description="未找到该动态" />
+        <el-empty description="&#x672A;&#x627E;&#x5230;&#x8BE5;&#x52A8;&#x6001;" />
       </div>
     </div>
   </div>
@@ -42,6 +42,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchNewsDetail } from "../api/content";
 import MediaAsset from "../components/MediaAsset.vue";
 import SectionHeading from "../components/SectionHeading.vue";
+import { sanitizeRichText } from "../utils/richText";
 
 const route = useRoute();
 const router = useRouter();
@@ -49,6 +50,9 @@ const loading = ref(false);
 const article = ref(null);
 
 const hasMedia = computed(() => Boolean(article.value?.cover_image || article.value?.video_url));
+const sanitizedContent = computed(() => sanitizeRichText(article.value?.content || ""));
+const backPath = computed(() => (typeof route.query.back === "string" ? route.query.back : ""));
+const backLabel = computed(() => (backPath.value ? "\u8fd4\u56de\u5217\u8868" : "\u8fd4\u56de\u52a8\u6001\u533a"));
 
 const formatDate = (value) => {
   if (!value) {
@@ -72,13 +76,17 @@ const loadArticle = async (id) => {
     article.value = await fetchNewsDetail(id);
   } catch (error) {
     article.value = null;
-    ElMessage.error(error.response?.data?.detail || "动态详情加载失败");
+    ElMessage.error(error.response?.data?.detail || "\u52a8\u6001\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25");
   } finally {
     loading.value = false;
   }
 };
 
-const goBackHome = async () => {
+const goBack = async () => {
+  if (backPath.value) {
+    await router.push(backPath.value);
+    return;
+  }
   await router.push({ path: "/", hash: "#news" });
 };
 
@@ -133,12 +141,6 @@ watch(
 .detail-media {
   width: 100%;
   min-height: 360px;
-}
-
-.detail-content {
-  color: var(--color-text-soft);
-  line-height: 1.9;
-  white-space: pre-line;
 }
 
 @media (max-width: 768px) {

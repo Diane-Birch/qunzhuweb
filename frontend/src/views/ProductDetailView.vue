@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="detail-page section-space">
     <div class="page-shell">
       <div v-if="loading" class="surface-card detail-loading">
@@ -6,10 +6,10 @@
       </div>
 
       <div v-else-if="product" class="detail-layout">
-        <button class="detail-back" type="button" @click="goBackHome">返回产品区</button>
+        <button class="detail-back" type="button" @click="goBack">{{ backLabel }}</button>
 
         <article class="surface-card detail-article">
-          <SectionHeading :title="product.name" :subtitle="product.subtitle" :description="product.description" />
+          <SectionHeading :title="product.name" :subtitle="product.subtitle" :description="productSummary" />
 
           <div v-if="hasMedia" class="detail-media-wrap">
             <MediaAsset
@@ -29,11 +29,13 @@
               <dd>{{ spec.value }}</dd>
             </div>
           </dl>
+
+          <div v-if="sanitizedDescription" class="rich-text-content detail-copy" v-html="sanitizedDescription" />
         </article>
       </div>
 
       <div v-else class="surface-card detail-empty">
-        <el-empty description="未找到该产品" />
+        <el-empty description="&#x672A;&#x627E;&#x5230;&#x8BE5;&#x4EA7;&#x54C1;" />
       </div>
     </div>
   </div>
@@ -47,6 +49,7 @@ import { useRoute, useRouter } from "vue-router";
 import { fetchProductDetail } from "../api/content";
 import MediaAsset from "../components/MediaAsset.vue";
 import SectionHeading from "../components/SectionHeading.vue";
+import { richTextToPlainText, sanitizeRichText } from "../utils/richText";
 
 const route = useRoute();
 const router = useRouter();
@@ -54,6 +57,14 @@ const loading = ref(false);
 const product = ref(null);
 
 const hasMedia = computed(() => Boolean(product.value?.cover_image || product.value?.video_url));
+const plainDescription = computed(() => richTextToPlainText(product.value?.description || ""));
+const productSummary = computed(() => {
+  const text = plainDescription.value;
+  return text.slice(0, 140) + (text.length > 140 ? "..." : "");
+});
+const sanitizedDescription = computed(() => sanitizeRichText(product.value?.description || ""));
+const backPath = computed(() => (typeof route.query.back === "string" ? route.query.back : ""));
+const backLabel = computed(() => (backPath.value ? "\u8fd4\u56de\u5217\u8868" : "\u8fd4\u56de\u4ea7\u54c1\u533a"));
 const specList = computed(() => {
   try {
     const raw = JSON.parse(product.value?.specs_json || "{}");
@@ -74,13 +85,17 @@ const loadProduct = async (id) => {
     product.value = await fetchProductDetail(id);
   } catch (error) {
     product.value = null;
-    ElMessage.error(error.response?.data?.detail || "产品详情加载失败");
+    ElMessage.error(error.response?.data?.detail || "\u4ea7\u54c1\u8be6\u60c5\u52a0\u8f7d\u5931\u8d25");
   } finally {
     loading.value = false;
   }
 };
 
-const goBackHome = async () => {
+const goBack = async () => {
+  if (backPath.value) {
+    await router.push(backPath.value);
+    return;
+  }
   await router.push({ path: "/", hash: "#products" });
 };
 
@@ -141,6 +156,7 @@ watch(
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  margin-bottom: 24px;
 }
 
 .detail-specs div {
@@ -158,6 +174,10 @@ watch(
   margin: 8px 0 0;
   font-weight: 600;
   color: var(--color-primary-deep);
+}
+
+.detail-copy {
+  margin-top: 10px;
 }
 
 @media (max-width: 768px) {

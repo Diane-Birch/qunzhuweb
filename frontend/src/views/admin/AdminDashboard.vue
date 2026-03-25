@@ -47,97 +47,70 @@
 
         <el-tab-pane label="版块管理" name="sections">
           <section class="panel-toolbar">
-            <span>管理首页文化版块、摘要、详情正文及其配套媒体素材。</span>
-            <el-button type="primary" @click="openSectionDialog()">新增版块</el-button>
+            <span>点击一级板块行展开子内容，同一时间仅展开一个板块。</span>
+            <el-button type="primary" :loading="sectionRootState.creating" @click="handleCreateSectionRoot">新增板块</el-button>
           </section>
-          <el-table :data="sectionState.items" v-loading="sectionState.loading">
-            <el-table-column prop="sort_order" label="排序" width="90" />
-            <el-table-column prop="name" label="名称" width="150" />
-            <el-table-column prop="key" label="标识" width="160" />
-            <el-table-column prop="title" label="标题" min-width="220" />
-            <el-table-column prop="summary" label="摘要" min-width="220" show-overflow-tooltip />
-            <el-table-column label="媒体" width="100">
-              <template #default="scope">{{ resolveMediaType(scope.row.media_type) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="openSectionDialog(scope.row)">编辑</el-button>
-                <el-button link type="danger" @click="handleDelete('section', scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            class="pager"
-            background
-            layout="total, prev, pager, next"
-            :total="sectionState.total"
-            :current-page="sectionState.page"
-            :page-size="sectionState.pageSize"
-            @current-change="(page) => loadSections(page)"
-          />
-        </el-tab-pane>
+          <div class="section-root-list" v-loading="sectionRootState.loading">
+            <article
+              v-for="root in sectionRootState.items"
+              :key="root.id"
+              class="section-root-card surface-card"
+              :class="{ 'is-expanded': expandedSectionId === root.id }"
+            >
+              <button class="section-root-row" type="button" @click="toggleSectionRoot(root)">
+                <div class="section-root-main">
+                  <strong>{{ root.name }}</strong>
+                  <span>{{ root.key }}</span>
+                  <p>{{ root.title }}</p>
+                </div>
+                <div class="section-root-meta">
+                  <span>排序 {{ root.sort_order }}</span>
+                  <span>{{ root.content_count || 0 }} 条内容</span>
+                  <div class="section-root-actions">
+                    <el-button link type="primary" @click.stop="openSectionRootDialog(root)">编辑</el-button>
+                    <el-button link type="danger" @click.stop="handleDelete('section-root', root)">删除</el-button>
+                  </div>
+                </div>
+              </button>
 
-        <el-tab-pane label="产品管理" name="products">
-          <section class="panel-toolbar">
-            <span>规格 JSON 仍可编辑，媒体内容支持图片或视频二选一。</span>
-            <el-button type="primary" @click="openProductDialog()">新增产品</el-button>
-          </section>
-          <el-table :data="productState.items" v-loading="productState.loading">
-            <el-table-column prop="sort_order" label="排序" width="90" />
-            <el-table-column prop="name" label="产品名称" min-width="180" />
-            <el-table-column prop="subtitle" label="副标题" min-width="180" />
-            <el-table-column label="媒体" width="100">
-              <template #default="scope">{{ resolveMediaType(scope.row.media_type) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="openProductDialog(scope.row)">编辑</el-button>
-                <el-button link type="danger" @click="handleDelete('product', scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            class="pager"
-            background
-            layout="total, prev, pager, next"
-            :total="productState.total"
-            :current-page="productState.page"
-            :page-size="productState.pageSize"
-            @current-change="(page) => loadProducts(page)"
-          />
-        </el-tab-pane>
+              <transition name="section-expand">
+                <div v-if="expandedSectionId === root.id" class="section-root-body">
+                  <div class="section-root-body-head">
+                    <div>
+                      <strong>{{ resolveSectionSourceLabel(root.content_source) }}</strong>
+                      <p>当前板块下的子内容仅在本板块内部维护。</p>
+                    </div>
+                    <el-button type="primary" plain @click="openChildDialog(root)">新增内容</el-button>
+                  </div>
 
-        <el-tab-pane label="动态管理" name="news">
-          <section class="panel-toolbar">
-            <span>动态卡片支持图片封面或视频封面二选一。</span>
-            <el-button type="primary" @click="openNewsDialog()">新增动态</el-button>
-          </section>
-          <el-table :data="newsState.items" v-loading="newsState.loading">
-            <el-table-column prop="sort_order" label="排序" width="90" />
-            <el-table-column prop="title" label="标题" min-width="220" />
-            <el-table-column prop="summary" label="摘要" min-width="220" show-overflow-tooltip />
-            <el-table-column label="媒体" width="100">
-              <template #default="scope">{{ resolveMediaType(scope.row.media_type) }}</template>
-            </el-table-column>
-            <el-table-column label="发布时间" min-width="180">
-              <template #default="scope">{{ formatDate(scope.row.published_at) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="180" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="openNewsDialog(scope.row)">编辑</el-button>
-                <el-button link type="danger" @click="handleDelete('news', scope.row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-pagination
-            class="pager"
-            background
-            layout="total, prev, pager, next"
-            :total="newsState.total"
-            :current-page="newsState.page"
-            :page-size="newsState.pageSize"
-            @current-change="(page) => loadNews(page)"
-          />
+                  <div v-if="expandedSectionState.loading" class="surface-card section-child-loading">
+                    <el-skeleton animated :rows="5" />
+                  </div>
+
+                  <el-table v-else :data="expandedSectionState.items">
+                    <el-table-column label="标题" min-width="220">
+                      <template #default="scope">{{ resolveExpandedItemTitle(scope.row, root) }}</template>
+                    </el-table-column>
+                    <el-table-column label="摘要" min-width="240" show-overflow-tooltip>
+                      <template #default="scope">{{ resolveExpandedItemSummary(scope.row, root) }}</template>
+                    </el-table-column>
+                    <el-table-column label="媒体" width="100">
+                      <template #default="scope">{{ resolveExpandedItemMediaType(scope.row, root) }}</template>
+                    </el-table-column>
+                    <el-table-column label="排序" width="90">
+                      <template #default="scope">{{ scope.row.sort_order }}</template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="180" fixed="right">
+                      <template #default="scope">
+                        <el-button link type="primary" @click="openChildDialog(root, scope.row)">编辑</el-button>
+                        <el-button link type="danger" @click="handleDelete(resolveSectionDeleteType(root), scope.row)">删除</el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
+              </transition>
+            </article>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="站点设置" name="site-settings">
@@ -286,23 +259,44 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="sectionDialog.visible" :title="sectionDialog.form.id ? '编辑版块' : '新增版块'" width="1040px">
-      <el-form label-position="top" :model="sectionDialog.form">
+    <el-dialog v-model="sectionRootDialog.visible" :title="sectionRootDialog.form.id ? '编辑板块' : '新增板块'" width="760px">
+      <el-form label-position="top" :model="sectionRootDialog.form">
         <el-row :gutter="16">
-          <el-col :md="12"><el-form-item label="版块名称"><el-input v-model="sectionDialog.form.name" /></el-form-item></el-col>
-          <el-col :md="12"><el-form-item label="版块标识"><el-input v-model="sectionDialog.form.key" placeholder="brand_story" /></el-form-item></el-col>
+          <el-col :md="12"><el-form-item label="板块名称"><el-input v-model="sectionRootDialog.form.name" /></el-form-item></el-col>
+          <el-col :md="12"><el-form-item label="板块标识"><el-input v-model="sectionRootDialog.form.key" placeholder="section-6" /></el-form-item></el-col>
         </el-row>
         <el-row :gutter="16">
-          <el-col :md="12"><el-form-item label="标题"><el-input v-model="sectionDialog.form.title" /></el-form-item></el-col>
+          <el-col :md="12"><el-form-item label="首页标题"><el-input v-model="sectionRootDialog.form.title" /></el-form-item></el-col>
+          <el-col :md="12"><el-form-item label="副标题"><el-input v-model="sectionRootDialog.form.subtitle" /></el-form-item></el-col>
+        </el-row>
+        <el-form-item label="摘要">
+          <el-input v-model="sectionRootDialog.form.summary" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+        <el-row :gutter="16">
+          <el-col :md="12"><el-form-item label="排序"><el-input-number v-model="sectionRootDialog.form.sort_order" :min="0" /></el-form-item></el-col>
+          <el-col :md="12"><el-form-item label="启用"><el-switch v-model="sectionRootDialog.form.is_active" /></el-form-item></el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="sectionRootDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="sectionRootDialog.submitting" @click="submitSectionRoot">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="sectionDialog.visible" :title="sectionDialog.form.id ? '编辑内容' : '新增内容'" width="1040px">
+      <el-form label-position="top" :model="sectionDialog.form">
+        <div class="field-tip">当前所属板块：{{ sectionDialog.parentLabel || '未选择板块' }}</div>
+        <el-row :gutter="16">
+          <el-col :md="12"><el-form-item label="内容标题"><el-input v-model="sectionDialog.form.title" /></el-form-item></el-col>
           <el-col :md="12"><el-form-item label="副标题"><el-input v-model="sectionDialog.form.subtitle" /></el-form-item></el-col>
         </el-row>
         <el-form-item label="摘要">
-          <el-input v-model="sectionDialog.form.summary" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="用于首页板块中的简短展示。" />
+          <el-input v-model="sectionDialog.form.summary" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="用于首页卡片与列表页摘要展示。" />
         </el-form-item>
         <el-form-item label="正文">
           <RichTextEditor v-model="sectionDialog.form.body" placeholder="支持段落、标题、加粗、列表、链接、图片等内容编辑。" />
         </el-form-item>
-        <MediaField label="版块媒体" v-model:mode="sectionDialog.form.media_type" v-model:image-url="sectionDialog.form.image_url" v-model:video-url="sectionDialog.form.video_url" />
+        <MediaField label="内容媒体" v-model:mode="sectionDialog.form.media_type" v-model:image-url="sectionDialog.form.image_url" v-model:video-url="sectionDialog.form.video_url" />
         <el-form-item label="扩展 JSON"><el-input v-model="sectionDialog.form.extra_json" type="textarea" :rows="5" placeholder='{"tags": ["eco"], "stats": [{"label": "Altitude", "value": "1400m+"}]}' /></el-form-item>
         <el-row :gutter="16">
           <el-col :md="12"><el-form-item label="排序"><el-input-number v-model="sectionDialog.form.sort_order" :min="0" /></el-form-item></el-col>
@@ -321,7 +315,9 @@
           <el-col :md="12"><el-form-item label="产品名称"><el-input v-model="productDialog.form.name" /></el-form-item></el-col>
           <el-col :md="12"><el-form-item label="副标题"><el-input v-model="productDialog.form.subtitle" /></el-form-item></el-col>
         </el-row>
-        <el-form-item label="描述"><el-input v-model="productDialog.form.description" type="textarea" :rows="5" /></el-form-item>
+        <el-form-item label="&#x63CF;&#x8FF0;">
+          <RichTextEditor v-model="productDialog.form.description" />
+        </el-form-item>
         <MediaField label="产品媒体" v-model:mode="productDialog.form.media_type" v-model:image-url="productDialog.form.cover_image" v-model:video-url="productDialog.form.video_url" />
         <el-form-item label="规格 JSON"><el-input v-model="productDialog.form.specs_json" type="textarea" :rows="5" placeholder='{"Net Weight": "2kg", "Texture": "soft"}' /></el-form-item>
         <el-row :gutter="16">
@@ -339,7 +335,9 @@
       <el-form label-position="top" :model="newsDialog.form">
         <el-form-item label="标题"><el-input v-model="newsDialog.form.title" /></el-form-item>
         <el-form-item label="摘要"><el-input v-model="newsDialog.form.summary" type="textarea" :rows="3" /></el-form-item>
-        <el-form-item label="正文内容"><el-input v-model="newsDialog.form.content" type="textarea" :rows="6" /></el-form-item>
+        <el-form-item label="&#x6B63;&#x6587;&#x5185;&#x5BB9;">
+          <RichTextEditor v-model="newsDialog.form.content" />
+        </el-form-item>
         <MediaField label="动态媒体" v-model:mode="newsDialog.form.media_type" v-model:image-url="newsDialog.form.cover_image" v-model:video-url="newsDialog.form.video_url" />
         <el-row :gutter="16">
           <el-col :md="12"><el-form-item label="发布时间"><el-date-picker v-model="newsDialog.form.published_at" type="datetime" value-format="YYYY-MM-DDTHH:mm:ss" placeholder="请选择时间" style="width: 100%" /></el-form-item></el-col>
@@ -367,20 +365,24 @@ import {
   createNews,
   createProduct,
   createSection,
+  createSectionRoot,
   deleteBanner,
   deleteNews,
   deleteProduct,
   deleteSection,
+  deleteSectionRoot,
   fetchBanners,
   fetchFooterSettings,
   fetchNews,
   fetchProducts,
+  fetchSectionRoots,
   fetchSections,
   saveFooterSettings,
   updateBanner,
   updateNews,
   updateProduct,
   updateSection,
+  updateSectionRoot,
 } from "../../api/content";
 import { clearToken } from "../../utils/auth";
 
@@ -415,9 +417,9 @@ const positionOptions = [
 
 const createListState = (pageSize) => reactive({ items: [], total: 0, page: 1, pageSize, loading: false });
 const bannerState = createListState(10);
-const sectionState = createListState(20);
-const productState = createListState(12);
-const newsState = createListState(10);
+const sectionRootState = reactive({ items: [], loading: false, creating: false });
+const expandedSectionId = ref(null);
+const expandedSectionState = reactive({ root: null, items: [], loading: false });
 
 const createBannerForm = () => ({
   id: null,
@@ -436,9 +438,20 @@ const createBannerForm = () => ({
   sort_order: 0,
   is_active: true,
 });
+const createSectionRootForm = () => ({
+  id: null,
+  key: "",
+  name: "",
+  title: "",
+  subtitle: "",
+  summary: "",
+  sort_order: 0,
+  is_active: true,
+});
 const createSectionForm = () => ({
   id: null,
   key: "",
+  parent_id: null,
   name: "",
   title: "",
   subtitle: "",
@@ -493,7 +506,8 @@ const createFooterSettingsForm = () => ({
 const normalizeMediaMode = (row) => row?.media_type || (row?.video_url ? "video" : "image");
 const normalizeSectionKey = (value) => String(value || "").trim().replace(/^#/, "");
 const bannerDialog = reactive({ visible: false, submitting: false, form: createBannerForm() });
-const sectionDialog = reactive({ visible: false, submitting: false, form: createSectionForm() });
+const sectionRootDialog = reactive({ visible: false, submitting: false, form: createSectionRootForm() });
+const sectionDialog = reactive({ visible: false, submitting: false, form: createSectionForm(), parent: null, parentLabel: "" });
 const productDialog = reactive({ visible: false, submitting: false, form: createProductForm() });
 const newsDialog = reactive({ visible: false, submitting: false, form: createNewsForm() });
 const footerSettingsState = reactive({ loading: false, saving: false, form: createFooterSettingsForm() });
@@ -506,7 +520,13 @@ const syncList = (state, data, page) => {
 
 const resolveMediaType = (value) => ((value || "image") === "video" ? "视频" : "图片");
 const getPositionLabel = (value) => positionOptions.find((item) => item.value === (value || "left-center"))?.label || "左侧居中";
-const resolveContentType = (type) => ({ banner: "轮播图", section: "版块", product: "产品", news: "动态" }[type] || "内容");
+const resolveSectionSourceLabel = (value) => ({ section: "图文内容", product: "产品内容", news: "动态内容" }[value] || "内容");
+const resolveContentType = (type) =>
+  ({ banner: "轮播图", "section-root": "板块", section: "内容", product: "产品", news: "动态" }[type] || "内容");
+const resolveSectionDeleteType = (root) => (root?.content_source === "section" ? "section" : root?.content_source || "section");
+const resolveExpandedItemTitle = (item, root) => (root?.content_source === "product" ? item.name : item.title);
+const resolveExpandedItemSummary = (item, root) => (root?.content_source === "product" ? item.subtitle || "" : item.summary || "");
+const resolveExpandedItemMediaType = (item) => resolveMediaType(item.media_type);
 const applyBannerSizePreset = (field, value) => {
   bannerDialog.form[field] = value;
 };
@@ -546,30 +566,42 @@ const loadBanners = async (page = bannerState.page) => {
   }
 };
 
-const loadSections = async (page = sectionState.page) => {
-  sectionState.loading = true;
+const loadSectionRoots = async () => {
+  sectionRootState.loading = true;
   try {
-    syncList(sectionState, await fetchSections({ page, page_size: sectionState.pageSize }), page);
+    sectionRootState.items = await fetchSectionRoots();
   } finally {
-    sectionState.loading = false;
+    sectionRootState.loading = false;
   }
 };
 
-const loadProducts = async (page = productState.page) => {
-  productState.loading = true;
+
+
+const loadExpandedSectionItems = async (root) => {
+  expandedSectionState.root = root;
+  expandedSectionState.loading = true;
   try {
-    syncList(productState, await fetchProducts({ page, page_size: productState.pageSize }), page);
+    if (root.content_source === "product") {
+      const data = await fetchProducts({ page: 1, page_size: 200 });
+      expandedSectionState.items = data.items || [];
+      return;
+    }
+    if (root.content_source === "news") {
+      const data = await fetchNews({ page: 1, page_size: 200 });
+      expandedSectionState.items = data.items || [];
+      return;
+    }
+    const data = await fetchSections({ page: 1, page_size: 200, node_type: "content", group_key: root.key });
+    expandedSectionState.items = data.items || [];
   } finally {
-    productState.loading = false;
+    expandedSectionState.loading = false;
   }
 };
 
-const loadNews = async (page = newsState.page) => {
-  newsState.loading = true;
-  try {
-    syncList(newsState, await fetchNews({ page, page_size: newsState.pageSize }), page);
-  } finally {
-    newsState.loading = false;
+const refreshExpandedSection = async () => {
+  const root = sectionRootState.items.find((item) => item.id === expandedSectionId.value) || expandedSectionState.root;
+  if (root) {
+    await loadExpandedSectionItems(root);
   }
 };
 
@@ -608,7 +640,8 @@ const buildFooterSettingsPayload = () => ({
 });
 
 const refreshAll = async () => {
-  await Promise.all([loadBanners(1), loadSections(1), loadProducts(1), loadNews(1), loadFooterSettings()]);
+  await Promise.all([loadBanners(1), loadSectionRoots(), loadFooterSettings()]);
+  await refreshExpandedSection();
 };
 
 const openBannerDialog = (row = null) => {
@@ -620,13 +653,28 @@ const openBannerDialog = (row = null) => {
   bannerDialog.visible = true;
 };
 
-const openSectionDialog = (row = null) => {
+const openSectionRootDialog = (row = null) => {
+  sectionRootDialog.form = {
+    ...createSectionRootForm(),
+    ...(row || {}),
+    key: normalizeSectionKey(row?.key || ""),
+  };
+  sectionRootDialog.visible = true;
+};
+
+const buildAutoContentKey = (parentKey) => `${normalizeSectionKey(parentKey)}-content-${Date.now()}`;
+
+const openSectionDialog = (parent = null, row = null) => {
   sectionDialog.form = {
     ...createSectionForm(),
     ...(row || {}),
     key: normalizeSectionKey(row?.key || ""),
+    parent_id: parent?.id || row?.parent_id || null,
+    name: row?.name || row?.title || "",
     media_type: normalizeMediaMode(row),
   };
+  sectionDialog.parent = parent || null;
+  sectionDialog.parentLabel = parent?.name || "";
   sectionDialog.visible = true;
 };
 
@@ -647,6 +695,51 @@ const openNewsDialog = (row = null) => {
     published_at: row?.published_at ? String(row.published_at).slice(0, 19) : createNewsForm().published_at,
   };
   newsDialog.visible = true;
+};
+
+const toggleSectionRoot = async (root) => {
+  if (expandedSectionId.value === root.id) {
+    expandedSectionId.value = null;
+    expandedSectionState.root = null;
+    expandedSectionState.items = [];
+    return;
+  }
+  expandedSectionId.value = root.id;
+  await loadExpandedSectionItems(root);
+};
+
+const handleCreateSectionRoot = async () => {
+  sectionRootState.creating = true;
+  try {
+    const nextIndex = sectionRootState.items.length + 1;
+    const root = await createSectionRoot({
+      name: `Section ${nextIndex}`,
+      title: `Section ${nextIndex}`,
+      subtitle: "",
+      summary: "",
+      sort_order: nextIndex,
+      is_active: true,
+    });
+    await loadSectionRoots();
+    openSectionRootDialog(root);
+    ElMessage.success("一级板块已创建");
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || "板块创建失败");
+  } finally {
+    sectionRootState.creating = false;
+  }
+};
+
+const openChildDialog = (root, row = null) => {
+  if (root.content_source === "product") {
+    openProductDialog(row);
+    return;
+  }
+  if (root.content_source === "news") {
+    openNewsDialog(row);
+    return;
+  }
+  openSectionDialog(root, row);
 };
 
 const submitBanner = async () => {
@@ -676,12 +769,38 @@ const submitBanner = async () => {
   }
 };
 
+const submitSectionRoot = async () => {
+  sectionRootDialog.submitting = true;
+  try {
+    const payload = {
+      ...sectionRootDialog.form,
+      key: normalizeSectionKey(sectionRootDialog.form.key),
+      summary: sectionRootDialog.form.summary?.trim() || "",
+    };
+    if (payload.id) {
+      await updateSectionRoot(payload.id, payload);
+    } else {
+      await createSectionRoot(payload);
+    }
+    ElMessage.success("板块已保存");
+    sectionRootDialog.visible = false;
+    await loadSectionRoots();
+    await refreshExpandedSection();
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || "板块保存失败");
+  } finally {
+    sectionRootDialog.submitting = false;
+  }
+};
+
 const submitSection = async () => {
   sectionDialog.submitting = true;
   try {
     const payload = {
       ...sectionDialog.form,
-      key: normalizeSectionKey(sectionDialog.form.key),
+      key: normalizeSectionKey(sectionDialog.form.key) || buildAutoContentKey(sectionDialog.parent?.key),
+      parent_id: sectionDialog.parent?.id || sectionDialog.form.parent_id,
+      name: sectionDialog.form.name?.trim() || sectionDialog.form.title?.trim() || "未命名内容",
       summary: sectionDialog.form.summary?.trim() || "",
       body: sectionDialog.form.body || "",
     };
@@ -695,11 +814,12 @@ const submitSection = async () => {
     } else {
       await createSection(payload);
     }
-    ElMessage.success("版块已保存");
+    ElMessage.success("内容已保存");
     sectionDialog.visible = false;
-    await loadSections(payload.id ? sectionState.page : 1);
+    await loadSectionRoots();
+    await refreshExpandedSection();
   } catch (error) {
-    ElMessage.error(error.response?.data?.detail || "版块保存失败");
+    ElMessage.error(error.response?.data?.detail || "内容保存失败");
   } finally {
     sectionDialog.submitting = false;
   }
@@ -721,7 +841,8 @@ const submitProduct = async () => {
     }
     ElMessage.success("产品已保存");
     productDialog.visible = false;
-    await loadProducts(payload.id ? productState.page : 1);
+    await loadSectionRoots();
+    await refreshExpandedSection();
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || "产品保存失败");
   } finally {
@@ -745,7 +866,8 @@ const submitNews = async () => {
     }
     ElMessage.success("动态已保存");
     newsDialog.visible = false;
-    await loadNews(payload.id ? newsState.page : 1);
+    await loadSectionRoots();
+    await refreshExpandedSection();
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || "动态保存失败");
   } finally {
@@ -777,15 +899,26 @@ const handleDelete = async (type, row) => {
     if (type === "banner") {
       await deleteBanner(row.id);
       await loadBanners(bannerState.page);
+    } else if (type === "section-root") {
+      await deleteSectionRoot(row.id);
+      if (expandedSectionId.value === row.id) {
+        expandedSectionId.value = null;
+        expandedSectionState.root = null;
+        expandedSectionState.items = [];
+      }
+      await loadSectionRoots();
     } else if (type === "section") {
       await deleteSection(row.id);
-      await loadSections(sectionState.page);
+      await loadSectionRoots();
+      await refreshExpandedSection();
     } else if (type === "product") {
       await deleteProduct(row.id);
-      await loadProducts(productState.page);
+      await loadSectionRoots();
+      await refreshExpandedSection();
     } else if (type === "news") {
       await deleteNews(row.id);
-      await loadNews(newsState.page);
+      await loadSectionRoots();
+      await refreshExpandedSection();
     }
 
     ElMessage.success("内容已删除");
@@ -802,18 +935,6 @@ const handleLogout = async () => {
   await router.push({ name: "admin-login" });
 };
 
-const formatDate = (value) => {
-  if (!value) {
-    return "";
-  }
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-};
 
 onMounted(refreshAll);
 </script>
@@ -873,6 +994,95 @@ onMounted(refreshAll);
 .pager {
   margin-top: 18px;
   justify-content: flex-end;
+}
+
+.section-root-list {
+  display: grid;
+  gap: 16px;
+}
+
+.section-root-card {
+  overflow: hidden;
+  border-radius: 24px;
+}
+
+.section-root-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 20px 22px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.section-root-main strong,
+.section-root-main span,
+.section-root-main p {
+  display: block;
+}
+
+.section-root-main strong {
+  color: var(--color-primary-deep);
+  font-size: 18px;
+}
+
+.section-root-main span,
+.section-root-body-head p {
+  margin-top: 6px;
+  color: var(--color-text-soft);
+}
+
+.section-root-main p {
+  margin: 8px 0 0;
+}
+
+.section-root-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  color: var(--color-text-soft);
+}
+
+.section-root-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-root-body {
+  padding: 0 22px 22px;
+}
+
+.section-root-body-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.section-root-body-head strong {
+  color: var(--color-primary-deep);
+}
+
+.section-child-loading {
+  padding: 20px;
+}
+
+.section-expand-enter-active,
+.section-expand-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.section-expand-enter-from,
+.section-expand-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
 }
 
 .site-setting-panel {
@@ -995,6 +1205,7 @@ onMounted(refreshAll);
 @media (max-width: 960px) {
   .dashboard-header,
   .panel-toolbar,
+  .section-root-body-head,
   .site-card-header,
   .qr-card-head {
     flex-direction: column;
@@ -1003,6 +1214,10 @@ onMounted(refreshAll);
 
   .dashboard-main {
     padding: 16px;
+  }
+
+  .section-root-row {
+    grid-template-columns: 1fr;
   }
 
   .style-grid {
@@ -1020,3 +1235,6 @@ onMounted(refreshAll);
   }
 }
 </style>
+
+
+

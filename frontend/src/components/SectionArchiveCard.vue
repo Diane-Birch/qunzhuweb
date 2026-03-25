@@ -1,20 +1,20 @@
 <template>
-  <button class="news-card surface-card" type="button" @click="openDetail">
-    <div v-if="hasMedia" class="news-image">
+  <button class="section-card surface-card" type="button" @click="openDetail">
+    <div v-if="hasMedia" class="section-image">
       <MediaAsset
         :media-type="item.media_type || 'image'"
-        :image-url="item.cover_image"
+        :image-url="item.image_url"
         :video-url="item.video_url"
         :alt="item.title"
         :controls="false"
-        wrapper-class="news-media-wrap"
-        element-class="news-media"
+        wrapper-class="section-media-wrap"
+        element-class="section-media"
       />
     </div>
-    <div class="news-content">
-      <p class="news-date">{{ formatDate(item.published_at) }}</p>
+    <div class="section-content">
+      <p class="section-date">{{ formatDate(item.created_at) }}</p>
       <h3>{{ item.title }}</h3>
-      <p v-if="item.summary" class="news-summary">{{ item.summary }}</p>
+      <p v-if="summaryText" class="section-summary">{{ summaryText }}</p>
     </div>
   </button>
 </template>
@@ -24,6 +24,7 @@ import { computed } from "vue";
 import { useRouter } from "vue-router";
 
 import MediaAsset from "./MediaAsset.vue";
+import { richTextToPlainText } from "../utils/richText";
 
 const props = defineProps({
   item: {
@@ -37,10 +38,13 @@ const props = defineProps({
 });
 
 const router = useRouter();
-const hasMedia = computed(() => Boolean(props.item.video_url || props.item.cover_image));
+const hasMedia = computed(() => Boolean(props.item.video_url || props.item.image_url));
+const summaryText = computed(() => props.item.summary || richTextToPlainText(props.item.body || ""));
 
 const formatDate = (value) => {
-  if (!value) return "";
+  if (!value) {
+    return "";
+  }
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "2-digit",
@@ -49,12 +53,12 @@ const formatDate = (value) => {
 };
 
 const openDetail = async () => {
-  await router.push({ name: "news-detail", params: { id: props.item.id }, query: props.detailQuery });
+  await router.push({ name: "section-detail", params: { key: props.item.key }, query: props.detailQuery });
 };
 </script>
 
 <style scoped>
-.news-card {
+.section-card {
   width: 100%;
   overflow: hidden;
   padding: 0;
@@ -63,22 +67,22 @@ const openDetail = async () => {
   cursor: pointer;
 }
 
-.news-image {
-  aspect-ratio: 1.4 / 1;
+.section-image {
+  aspect-ratio: 1.3 / 1;
   overflow: hidden;
 }
 
-.news-media-wrap,
-.news-media {
+.section-media-wrap,
+.section-media {
   width: 100%;
   height: 100%;
 }
 
-.news-content {
+.section-content {
   padding: 22px;
 }
 
-.news-date {
+.section-date {
   margin: 0 0 10px;
   color: var(--color-secondary);
   font-size: 13px;
@@ -91,7 +95,7 @@ h3 {
   font-family: var(--font-display);
 }
 
-.news-summary {
+.section-summary {
   margin: 16px 0 0;
   color: var(--color-text-soft);
   line-height: 1.8;
