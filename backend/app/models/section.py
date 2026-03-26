@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text
+﻿from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from backend.app.models.base import BaseModel, SortableActiveMixin
 
@@ -23,3 +23,5 @@ class SiteSection(BaseModel, SortableActiveMixin):
     media_type = Column(String(20), nullable=True)
     video_url = Column(String(500), nullable=True)
     extra_json = Column(Text, nullable=True)
+    pinned_at = Column(DateTime, nullable=True)
+

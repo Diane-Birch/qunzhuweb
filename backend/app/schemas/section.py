@@ -1,3 +1,4 @@
+﻿from datetime import datetime
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, root_validator
@@ -84,7 +85,7 @@ class SectionBase(BaseModel):
     media_type: MediaType = "image"
     video_url: Optional[str] = Field(None, max_length=500)
     extra_json: Optional[str] = None
-    sort_order: int = 0
+    sort_order: int = 1
     is_active: bool = True
 
     @root_validator
@@ -109,7 +110,7 @@ class SectionUpdate(SectionBase):
 
 
 class SectionRead(SectionBase, TimestampSchema):
-    pass
+    pinned_at: Optional[datetime] = None
 
 
 class SectionRootCreate(BaseModel):
@@ -133,3 +134,4 @@ class SectionRootUpdate(SectionRootCreate):
 
 class SectionRootRead(SectionRead):
     content_count: int = 0
+

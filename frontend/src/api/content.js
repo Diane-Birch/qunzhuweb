@@ -1,4 +1,4 @@
-import http from "./http";
+﻿import http from "./http";
 
 export const fetchHomepage = async () => {
   const { data } = await http.get("/public/home");
@@ -119,6 +119,16 @@ export const updateSection = async (id, payload) => {
   return data;
 };
 
+export const pinSection = async (id) => {
+  const { data } = await http.post(`/sections/${id}/pin`);
+  return data;
+};
+
+export const unpinSection = async (id) => {
+  const { data } = await http.post(`/sections/${id}/unpin`);
+  return data;
+};
+
 export const deleteSection = async (id) => {
   const { data } = await http.delete(`/sections/${id}`);
   return data;
@@ -139,6 +149,16 @@ export const updateProduct = async (id, payload) => {
   return data;
 };
 
+export const pinProduct = async (id) => {
+  const { data } = await http.post(`/products/${id}/pin`);
+  return data;
+};
+
+export const unpinProduct = async (id) => {
+  const { data } = await http.post(`/products/${id}/unpin`);
+  return data;
+};
+
 export const deleteProduct = async (id) => {
   const { data } = await http.delete(`/products/${id}`);
   return data;
@@ -156,6 +176,16 @@ export const createNews = async (payload) => {
 
 export const updateNews = async (id, payload) => {
   const { data } = await http.put(`/news/${id}`, payload);
+  return data;
+};
+
+export const pinNews = async (id) => {
+  const { data } = await http.post(`/news/${id}/pin`);
+  return data;
+};
+
+export const unpinNews = async (id) => {
+  const { data } = await http.post(`/news/${id}/unpin`);
   return data;
 };
 

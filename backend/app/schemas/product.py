@@ -1,4 +1,5 @@
-﻿from typing import Literal, Optional
+﻿from datetime import datetime
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, root_validator
 
@@ -36,4 +37,4 @@ class ProductUpdate(ProductBase):
 
 
 class ProductRead(ProductBase, TimestampSchema):
-    pass
+    pinned_at: Optional[datetime] = None

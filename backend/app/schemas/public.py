@@ -19,3 +19,11 @@ class HomePageResponse(BaseModel):
     news_intro: Optional[SectionRead] = None
     footer_qr_codes: List[FooterQRCodeRead] = Field(default_factory=list)
     footer_filing: Optional[SiteSettingRead] = None
+
+
+class SectionArchiveResponse(BaseModel):
+    root: SectionRead
+    total: int
+    page: int
+    page_size: int
+    items: List[SectionRead]

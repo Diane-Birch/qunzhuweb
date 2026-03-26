@@ -1,3 +1,4 @@
+﻿from datetime import datetime
 from typing import List
 from uuid import uuid4
 
@@ -8,9 +9,11 @@ from sqlalchemy.orm import Session
 from backend.app.core.database import get_db
 from backend.app.crud.content import (
     apply_keyword_filter,
+    apply_section_content_order,
     create_record,
     delete_record,
     paginate,
+    paginate_query,
     update_record,
 )
 from backend.app.deps import get_current_admin
@@ -59,6 +62,15 @@ def generate_content_key(parent: SiteSection, title: str) -> str:
     normalized_parent = normalize_section_key(parent.key) or "section"
     token = uuid4().hex[:8]
     return f"{normalized_parent}-content-{token}"
+
+
+def build_publication_weight(reference_time=None) -> int:
+    timestamp = int((reference_time or datetime.utcnow()).timestamp())
+    return max(timestamp, 1)
+
+
+def is_pinned_section(section: SiteSection) -> bool:
+    return section.node_type == "content" and section.content_source == "section" and section.sort_order == 0
 
 
 def next_section_root_key(db: Session) -> str:
@@ -228,7 +240,11 @@ def list_sections(
         query = query.filter(SiteSection.node_type == normalized_node_type)
     if normalized_group_key:
         query = query.filter(build_section_group_filter(normalized_group_key))
-    return paginate(query, PageParams(page=page, page_size=page_size, keyword=keyword), SiteSection, "sort_order")
+    params = PageParams(page=page, page_size=page_size, keyword=keyword)
+    if normalized_node_type == "content":
+        query = apply_section_content_order(query, SiteSection)
+        return paginate_query(query, params)
+    return paginate(query, params, SiteSection, "sort_order")
 
 
 @router.post("", response_model=SectionRead)
@@ -259,6 +275,7 @@ def create_section(
     payload.key = key
     payload.node_type = "content"
     payload.content_source = "section"
+    payload.sort_order = build_publication_weight()
     if parent:
         payload.parent_id = parent.id
         payload.group_key = parent.key
@@ -292,7 +309,46 @@ def update_section(
         payload.group_key = parent.key
     payload.node_type = "content"
     payload.content_source = "section"
+    payload.sort_order = 0 if is_pinned_section(section) else build_publication_weight(section.created_at)
     return update_record(db, section, payload)
+
+
+@router.post("/{section_id}/pin", response_model=SectionRead)
+def pin_section(
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    section = db.query(SiteSection).filter(SiteSection.id == section_id).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+    if section.node_type != "content":
+        raise HTTPException(status_code=400, detail="Only child content can be pinned")
+
+    section.sort_order = 0
+    section.pinned_at = datetime.utcnow()
+    db.commit()
+    db.refresh(section)
+    return section
+
+
+@router.post("/{section_id}/unpin", response_model=SectionRead)
+def unpin_section(
+    section_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    section = db.query(SiteSection).filter(SiteSection.id == section_id).first()
+    if not section:
+        raise HTTPException(status_code=404, detail="Section not found")
+    if section.node_type != "content":
+        raise HTTPException(status_code=400, detail="Only child content can be unpinned")
+
+    section.sort_order = build_publication_weight(section.created_at)
+    section.pinned_at = None
+    db.commit()
+    db.refresh(section)
+    return section
 
 
 @router.delete("/{section_id}")
@@ -308,3 +364,8 @@ def remove_section(
         raise HTTPException(status_code=400, detail="Use /sections/roots/{id} to delete a top-level section")
     delete_record(db, section)
     return {"message": "Section deleted"}
+
+
+
+
+

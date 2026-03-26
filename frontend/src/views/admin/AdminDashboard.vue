@@ -97,11 +97,18 @@
                     <el-table-column label="媒体" width="100">
                       <template #default="scope">{{ resolveExpandedItemMediaType(scope.row, root) }}</template>
                     </el-table-column>
-                    <el-table-column label="排序" width="90">
-                      <template #default="scope">{{ scope.row.sort_order }}</template>
-                    </el-table-column>
-                    <el-table-column label="操作" width="180" fixed="right">
+                    <el-table-column label="排序" width="120">
                       <template #default="scope">
+                        <el-tag :type="scope.row.sort_order === 0 ? 'danger' : 'info'" effect="plain">
+                          {{ resolveExpandedItemSortLabel(scope.row, root) }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column label="操作" width="250" fixed="right">
+                      <template #default="scope">
+                        <el-button link type="warning" :loading="expandedSectionState.togglingId === scope.row.id" @click="handleToggleExpandedPin(root, scope.row)">
+                          {{ scope.row.sort_order === 0 ? '取消置顶' : '置顶' }}
+                        </el-button>
                         <el-button link type="primary" @click="openChildDialog(root, scope.row)">编辑</el-button>
                         <el-button link type="danger" @click="handleDelete(resolveSectionDeleteType(root), scope.row)">删除</el-button>
                       </template>
@@ -298,8 +305,8 @@
         </el-form-item>
         <MediaField label="内容媒体" v-model:mode="sectionDialog.form.media_type" v-model:image-url="sectionDialog.form.image_url" v-model:video-url="sectionDialog.form.video_url" />
         <el-form-item label="扩展 JSON"><el-input v-model="sectionDialog.form.extra_json" type="textarea" :rows="5" placeholder='{"tags": ["eco"], "stats": [{"label": "Altitude", "value": "1400m+"}]}' /></el-form-item>
+        <div class="field-tip">默认按发布时间倒序展示；如需优先展示，请在列表中使用“置顶 / 取消置顶”按钮调整。</div>
         <el-row :gutter="16">
-          <el-col :md="12"><el-form-item label="排序"><el-input-number v-model="sectionDialog.form.sort_order" :min="0" /></el-form-item></el-col>
           <el-col :md="12"><el-form-item label="启用"><el-switch v-model="sectionDialog.form.is_active" /></el-form-item></el-col>
         </el-row>
       </el-form>
@@ -377,7 +384,13 @@ import {
   fetchProducts,
   fetchSectionRoots,
   fetchSections,
+  pinNews,
+  pinProduct,
+  pinSection,
   saveFooterSettings,
+  unpinNews,
+  unpinProduct,
+  unpinSection,
   updateBanner,
   updateNews,
   updateProduct,
@@ -419,7 +432,7 @@ const createListState = (pageSize) => reactive({ items: [], total: 0, page: 1, p
 const bannerState = createListState(10);
 const sectionRootState = reactive({ items: [], loading: false, creating: false });
 const expandedSectionId = ref(null);
-const expandedSectionState = reactive({ root: null, items: [], loading: false });
+const expandedSectionState = reactive({ root: null, items: [], loading: false, togglingId: null });
 
 const createBannerForm = () => ({
   id: null,
@@ -461,7 +474,7 @@ const createSectionForm = () => ({
   media_type: "image",
   video_url: "",
   extra_json: "",
-  sort_order: 0,
+  sort_order: 1,
   is_active: true,
 });
 const createProductForm = () => ({
@@ -502,7 +515,6 @@ const createFooterSettingsForm = () => ({
   filing_text: "",
   filing_is_active: true,
 });
-
 const normalizeMediaMode = (row) => row?.media_type || (row?.video_url ? "video" : "image");
 const normalizeSectionKey = (value) => String(value || "").trim().replace(/^#/, "");
 const bannerDialog = reactive({ visible: false, submitting: false, form: createBannerForm() });
@@ -527,6 +539,7 @@ const resolveSectionDeleteType = (root) => (root?.content_source === "section" ?
 const resolveExpandedItemTitle = (item, root) => (root?.content_source === "product" ? item.name : item.title);
 const resolveExpandedItemSummary = (item, root) => (root?.content_source === "product" ? item.subtitle || "" : item.summary || "");
 const resolveExpandedItemMediaType = (item) => resolveMediaType(item.media_type);
+const resolveExpandedItemSortLabel = (item) => (item.sort_order === 0 ? "置顶" : "发布时间");
 const applyBannerSizePreset = (field, value) => {
   bannerDialog.form[field] = value;
 };
@@ -803,6 +816,7 @@ const submitSection = async () => {
       name: sectionDialog.form.name?.trim() || sectionDialog.form.title?.trim() || "未命名内容",
       summary: sectionDialog.form.summary?.trim() || "",
       body: sectionDialog.form.body || "",
+      sort_order: sectionDialog.form.sort_order === 0 ? 0 : 1,
     };
     if (payload.media_type === "video") {
       payload.image_url = null;
@@ -828,7 +842,10 @@ const submitSection = async () => {
 const submitProduct = async () => {
   productDialog.submitting = true;
   try {
-    const payload = { ...productDialog.form };
+    const payload = {
+      ...productDialog.form,
+      sort_order: productDialog.form.sort_order === 0 ? 0 : 1,
+    };
     if (payload.media_type === "video") {
       payload.cover_image = null;
     } else {
@@ -853,7 +870,10 @@ const submitProduct = async () => {
 const submitNews = async () => {
   newsDialog.submitting = true;
   try {
-    const payload = { ...newsDialog.form };
+    const payload = {
+      ...newsDialog.form,
+      sort_order: newsDialog.form.sort_order === 0 ? 0 : 1,
+    };
     if (payload.media_type === "video") {
       payload.cover_image = null;
     } else {
@@ -872,6 +892,41 @@ const submitNews = async () => {
     ElMessage.error(error.response?.data?.detail || "动态保存失败");
   } finally {
     newsDialog.submitting = false;
+  }
+};
+const handleToggleExpandedPin = async (root, row) => {
+  expandedSectionState.togglingId = row.id;
+  try {
+    if (root.content_source === "product") {
+      if (row.sort_order === 0) {
+        await unpinProduct(row.id);
+        ElMessage.success("已取消置顶");
+      } else {
+        await pinProduct(row.id);
+        ElMessage.success("已置顶");
+      }
+    } else if (root.content_source === "news") {
+      if (row.sort_order === 0) {
+        await unpinNews(row.id);
+        ElMessage.success("已取消置顶");
+      } else {
+        await pinNews(row.id);
+        ElMessage.success("已置顶");
+      }
+    } else {
+      if (row.sort_order === 0) {
+        await unpinSection(row.id);
+        ElMessage.success("已取消置顶");
+      } else {
+        await pinSection(row.id);
+        ElMessage.success("已置顶");
+      }
+    }
+    await refreshExpandedSection();
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || "排序更新失败");
+  } finally {
+    expandedSectionState.togglingId = null;
   }
 };
 
@@ -1235,6 +1290,18 @@ onMounted(refreshAll);
   }
 }
 </style>
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

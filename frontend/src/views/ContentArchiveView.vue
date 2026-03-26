@@ -1,9 +1,9 @@
-<template>
+﻿<template>
   <div class="archive-page section-space">
     <div class="page-shell">
       <div class="archive-head">
-        <button class="archive-back" type="button" @click="goBackHome">&#x8FD4;&#x56DE;&#x9996;&#x9875;</button>
-        <SectionHeading :title="currentConfig.title" :subtitle="currentConfig.subtitle" :description="currentConfig.rule" />
+        <button class="archive-back" type="button" @click="goBackHome">返回首页</button>
+        <SectionHeading :title="currentConfig.title" :subtitle="currentConfig.subtitle" :description="currentConfig.description" />
       </div>
 
       <div v-if="loading" class="surface-card archive-loading">
@@ -37,7 +37,7 @@
         </div>
 
         <div v-else class="surface-card archive-empty">
-          <el-empty description="&#x6682;&#x65E0;&#x5185;&#x5BB9;" />
+          <el-empty description="暂无内容" />
         </div>
 
         <el-pagination
@@ -85,19 +85,40 @@ const items = ref([]);
 const total = ref(0);
 const page = ref(1);
 const pageSize = 9;
+const sectionRoot = ref(null);
 
 const currentConfig = computed(() => {
   if (props.contentType === "section") {
-    return sectionBoardMap[props.groupKey] || {
-      title: "\u677f\u5757\u5185\u5bb9\u5217\u8868",
-      subtitle: "\u5386\u53f2\u5185\u5bb9\u5f52\u6863",
-      rule: "\u6309\u53d1\u5e03\u65f6\u95f4\u5012\u5e8f\u5c55\u793a\u5168\u90e8\u5185\u5bb9\u3002",
+    const fallback = sectionBoardMap[props.groupKey] || {
+      title: "板块内容列表",
+      subtitle: "历史内容归档",
+      description: "按发布时间倒序展示全部内容。",
+    };
+    if (!sectionRoot.value) {
+      return {
+        title: fallback.title,
+        subtitle: fallback.subtitle,
+        description: fallback.description,
+      };
+    }
+    return {
+      title: sectionRoot.value.title || fallback.title,
+      subtitle: sectionRoot.value.subtitle || "",
+      description: sectionRoot.value.summary || "",
     };
   }
   if (props.contentType === "product") {
-    return productArchiveConfig;
+    return {
+      title: productArchiveConfig.title,
+      subtitle: productArchiveConfig.subtitle,
+      description: productArchiveConfig.rule,
+    };
   }
-  return newsArchiveConfig;
+  return {
+    title: newsArchiveConfig.title,
+    subtitle: newsArchiveConfig.subtitle,
+    description: newsArchiveConfig.rule,
+  };
 });
 
 const detailQuery = computed(() => ({ back: route.fullPath }));
@@ -113,10 +134,13 @@ const loadPage = async (targetPage = 1) => {
     let data;
     if (props.contentType === "section") {
       data = await fetchPublicSectionGroup(props.groupKey, { page: targetPage, page_size: pageSize });
+      sectionRoot.value = data.root || null;
     } else if (props.contentType === "product") {
       data = await fetchPublicProducts({ page: targetPage, page_size: pageSize });
+      sectionRoot.value = null;
     } else {
       data = await fetchPublicNews({ page: targetPage, page_size: pageSize });
+      sectionRoot.value = null;
     }
     items.value = data.items || [];
     total.value = data.total || 0;
@@ -124,7 +148,8 @@ const loadPage = async (targetPage = 1) => {
   } catch (error) {
     items.value = [];
     total.value = 0;
-    ElMessage.error(error.response?.data?.detail || "\u5217\u8868\u52a0\u8f7d\u5931\u8d25");
+    sectionRoot.value = null;
+    ElMessage.error(error.response?.data?.detail || "列表加载失败");
   } finally {
     loading.value = false;
   }

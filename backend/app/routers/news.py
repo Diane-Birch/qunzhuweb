@@ -1,12 +1,15 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+﻿from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.core.database import get_db
 from backend.app.crud.content import (
     apply_keyword_filter,
+    apply_pinned_order,
     create_record,
     delete_record,
-    paginate,
+    paginate_query,
     update_record,
 )
 from backend.app.deps import get_current_admin
@@ -19,6 +22,11 @@ from backend.app.schemas.news import NewsCreate, NewsRead, NewsUpdate
 router = APIRouter(prefix="/news", tags=["news"])
 
 
+def build_news_weight(reference_time=None) -> int:
+    timestamp = int((reference_time or datetime.utcnow()).timestamp())
+    return max(timestamp, 1)
+
+
 @router.get("", response_model=PageResult[NewsRead])
 def list_news(
     page: int = 1,
@@ -28,7 +36,8 @@ def list_news(
     _: AdminUser = Depends(get_current_admin),
 ):
     query = apply_keyword_filter(db.query(NewsArticle), NewsArticle, keyword, ["title", "summary"])
-    return paginate(query, PageParams(page=page, page_size=page_size, keyword=keyword), NewsArticle, "sort_order")
+    query = apply_pinned_order(query, NewsArticle, "published_at", "created_at", "id")
+    return paginate_query(query, PageParams(page=page, page_size=page_size, keyword=keyword))
 
 
 @router.post("", response_model=NewsRead)
@@ -37,6 +46,7 @@ def create_news(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    payload.sort_order = build_news_weight(payload.published_at)
     return create_record(db, NewsArticle, payload)
 
 
@@ -50,7 +60,42 @@ def update_news(
     article = db.query(NewsArticle).filter(NewsArticle.id == news_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="News article not found")
+    payload.sort_order = 0 if article.sort_order == 0 else build_news_weight(payload.published_at)
     return update_record(db, article, payload)
+
+
+@router.post("/{news_id}/pin", response_model=NewsRead)
+def pin_news(
+    news_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    article = db.query(NewsArticle).filter(NewsArticle.id == news_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="News article not found")
+
+    article.sort_order = 0
+    article.pinned_at = datetime.utcnow()
+    db.commit()
+    db.refresh(article)
+    return article
+
+
+@router.post("/{news_id}/unpin", response_model=NewsRead)
+def unpin_news(
+    news_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    article = db.query(NewsArticle).filter(NewsArticle.id == news_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="News article not found")
+
+    article.sort_order = build_news_weight(article.published_at)
+    article.pinned_at = None
+    db.commit()
+    db.refresh(article)
+    return article
 
 
 @router.delete("/{news_id}")
