@@ -175,9 +175,17 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
             continue
         latest_sections[group_key] = section
 
+    homepage_sections = []
+    for root in section_roots:
+        section = latest_sections.get(root.key)
+        if not section:
+            continue
+        section.subtitle = root.subtitle
+        homepage_sections.append(section)
+
     return HomePageResponse(
         banners=banners,
-        sections=[latest_sections[key] for key in section_root_keys if key in latest_sections],
+        sections=homepage_sections,
         products=products,
         news=news,
         product_intro=product_intro,
@@ -185,7 +193,6 @@ def get_homepage(db: Session = Depends(get_db)) -> HomePageResponse:
         footer_qr_codes=get_footer_qr_codes(db),
         footer_filing=footer_filing,
     )
-
 
 @router.get("/section-groups/{group_key}", response_model=SectionArchiveResponse)
 def list_public_section_group(
@@ -297,6 +304,10 @@ def get_public_news_detail(news_id: int, db: Session = Depends(get_db)) -> NewsR
     if not article:
         raise HTTPException(status_code=404, detail="News article not found")
     return article
+
+
+
+
 
 
 

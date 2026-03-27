@@ -213,10 +213,11 @@ const emptyNewsText = "\u6682\u65e0\u52a8\u6001\u5185\u5bb9";
 const qrFallbackLabel = "\u4e8c\u7ef4\u7801";
 const filingFallbackLabel = "\u5907\u6848\u4fe1\u606f";
 const homepage = reactive({
-  banners: [],
-  sections: [],
-  products: [],
-  news: [],
+ banners: [],
+ sections: [],
+ section_roots: [],
+ products: [],
+ news: [],
   product_intro: null,
   news_intro: null,
   footer_qr_codes: [],
@@ -424,3 +425,4 @@ onMounted(loadHomepage);
 @media (max-width: 1024px) { .story-card, .news-grid, .product-grid, .footer-panel { grid-template-columns: 1fr; } }
 @media (max-width: 768px) { .topbar-inner { gap: 12px; min-height: 68px; padding: 10px 16px; } .brand-group { gap: 10px; } .brand-title { font-size: clamp(20px, 6vw, 26px); } .nav-trigger { padding: 10px 16px; } .story-card { padding: 18px; } .story-image-button { min-height: 220px; } .story-title-button { font-size: 32px; } .section-header-row { flex-direction: column; align-items: flex-start; } .transition-ridge { min-height: 142px; } .terrace-line:nth-child(1) { width: calc(100% - 56px); } .terrace-line:nth-child(2) { width: calc(100% - 92px); } .terrace-line:nth-child(3) { width: calc(100% - 128px); } .terrace-line:nth-child(4) { width: calc(100% - 164px); } .terrace-line:nth-child(5) { width: calc(100% - 212px); } .footer-shell { margin-top: -24px; } .footer-panel { gap: 18px; padding: 22px 18px; } .footer-qr-card { width: min(100%, 160px); } }
 </style>
+

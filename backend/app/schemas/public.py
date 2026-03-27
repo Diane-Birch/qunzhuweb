@@ -11,19 +11,19 @@ from backend.app.schemas.site_setting import SiteSettingRead
 
 
 class HomePageResponse(BaseModel):
-    banners: List[BannerRead]
-    sections: List[SectionRead]
-    products: List[ProductRead]
-    news: List[NewsRead]
-    product_intro: Optional[SectionRead] = None
-    news_intro: Optional[SectionRead] = None
-    footer_qr_codes: List[FooterQRCodeRead] = Field(default_factory=list)
-    footer_filing: Optional[SiteSettingRead] = None
+ banners: List[BannerRead]
+ sections: List[SectionRead]
+ products: List[ProductRead]
+ news: List[NewsRead]
+ product_intro: Optional[SectionRead] = None
+ news_intro: Optional[SectionRead] = None
+ footer_qr_codes: List[FooterQRCodeRead] = Field(default_factory=list)
+ footer_filing: Optional[SiteSettingRead] = None
 
 
 class SectionArchiveResponse(BaseModel):
-    root: SectionRead
-    total: int
-    page: int
-    page_size: int
-    items: List[SectionRead]
+ root: SectionRead
+ total: int
+ page: int
+ page_size: int
+ items: List[SectionRead]

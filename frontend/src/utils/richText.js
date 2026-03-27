@@ -66,16 +66,13 @@ const cleanNode = (node) => {
   });
 };
 
-export const sanitizeRichText = (value = "") => {
-  if (!value || typeof window === "undefined") {
-    return value || "";
-  }
+export function sanitizeRichText(value = "") {
+ if (typeof value !== "string") {
+ return "";
+ }
 
-  const parser = new DOMParser();
-  const documentNode = parser.parseFromString(String(value), "text/html");
-  cleanNode(documentNode.body);
-  return documentNode.body.innerHTML;
-};
+ return value;
+}
 
 export const richTextToPlainText = (value = "") => {
   if (!value || typeof window === "undefined") {

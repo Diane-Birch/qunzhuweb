@@ -60,7 +60,7 @@ import { ElMessage } from "element-plus";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { fetchPublicNews, fetchPublicProducts, fetchPublicSectionGroup } from "../api/content";
+import { fetchHomepage, fetchPublicNews, fetchPublicProducts, fetchPublicSectionGroup } from "../api/content";
 import NewsCard from "../components/NewsCard.vue";
 import ProductCard from "../components/ProductCard.vue";
 import SectionArchiveCard from "../components/SectionArchiveCard.vue";
@@ -86,6 +86,7 @@ const total = ref(0);
 const page = ref(1);
 const pageSize = 9;
 const sectionRoot = ref(null);
+const archiveIntro = ref(null);
 
 const currentConfig = computed(() => {
   if (props.contentType === "section") {
@@ -106,19 +107,19 @@ const currentConfig = computed(() => {
       subtitle: sectionRoot.value.subtitle || "",
       description: sectionRoot.value.summary || "",
     };
-  }
-  if (props.contentType === "product") {
-    return {
-      title: productArchiveConfig.title,
-      subtitle: productArchiveConfig.subtitle,
-      description: productArchiveConfig.rule,
-    };
-  }
-  return {
-    title: newsArchiveConfig.title,
-    subtitle: newsArchiveConfig.subtitle,
-    description: newsArchiveConfig.rule,
-  };
+ }
+ if (props.contentType === "product") {
+ return {
+ title: archiveIntro.value?.title || productArchiveConfig.title,
+ subtitle: archiveIntro.value?.subtitle || "",
+ description: archiveIntro.value?.summary || productArchiveConfig.rule,
+ };
+ }
+ return {
+ title: archiveIntro.value?.title || newsArchiveConfig.title,
+ subtitle: archiveIntro.value?.subtitle || "",
+ description: archiveIntro.value?.summary || newsArchiveConfig.rule,
+ };
 });
 
 const detailQuery = computed(() => ({ back: route.fullPath }));
@@ -128,39 +129,53 @@ const goBackHome = async () => {
   await router.push({ path: "/", hash });
 };
 
+
 const loadPage = async (targetPage = 1) => {
-  loading.value = true;
-  try {
-    let data;
-    if (props.contentType === "section") {
-      data = await fetchPublicSectionGroup(props.groupKey, { page: targetPage, page_size: pageSize });
-      sectionRoot.value = data.root || null;
-    } else if (props.contentType === "product") {
-      data = await fetchPublicProducts({ page: targetPage, page_size: pageSize });
-      sectionRoot.value = null;
-    } else {
-      data = await fetchPublicNews({ page: targetPage, page_size: pageSize });
-      sectionRoot.value = null;
-    }
-    items.value = data.items || [];
-    total.value = data.total || 0;
-    page.value = targetPage;
-  } catch (error) {
-    items.value = [];
-    total.value = 0;
-    sectionRoot.value = null;
-    ElMessage.error(error.response?.data?.detail || "列表加载失败");
-  } finally {
-    loading.value = false;
-  }
+ loading.value = true;
+ try {
+ let data;
+ let homepageData = null;
+ if (props.contentType === "section") {
+ data = await fetchPublicSectionGroup(props.groupKey, { page: targetPage, page_size: pageSize });
+ sectionRoot.value = data.root || null;
+ archiveIntro.value = null;
+ } else if (props.contentType === "product") {
+ [data, homepageData] = await Promise.all([
+ fetchPublicProducts({ page: targetPage, page_size: pageSize }),
+ archiveIntro.value ? Promise.resolve(null) : fetchHomepage(),
+ ]);
+ sectionRoot.value = null;
+ } else {
+ [data, homepageData] = await Promise.all([
+ fetchPublicNews({ page: targetPage, page_size: pageSize }),
+ archiveIntro.value ? Promise.resolve(null) : fetchHomepage(),
+ ]);
+ sectionRoot.value = null;
+ }
+ if (homepageData) {
+ archiveIntro.value = props.contentType === "product" ? homepageData.product_intro || null : homepageData.news_intro || null;
+ }
+ items.value = data.items || [];
+ total.value = data.total || 0;
+ page.value = targetPage;
+ } catch (error) {
+ items.value = [];
+ total.value = 0;
+ sectionRoot.value = null;
+ archiveIntro.value = null;
+ ElMessage.error(error.response?.data?.detail || "列表加载失败");
+ } finally {
+ loading.value = false;
+ }
 };
 
 watch(
-  () => [props.contentType, props.groupKey],
-  () => {
-    loadPage(1);
-  },
-  { immediate: true }
+ () => [props.contentType, props.groupKey],
+ () => {
+ archiveIntro.value = null;
+ loadPage(1);
+ },
+ { immediate: true }
 );
 </script>
 
