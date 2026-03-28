@@ -1,6 +1,6 @@
-<template>
+﻿<template>
   <div class="section-detail-page section-space">
-    <div class="page-shell">
+    <div class="page-shell detail-page-shell">
       <div v-if="loading" class="surface-card detail-loading">
         <el-skeleton animated :rows="10" />
       </div>
@@ -18,6 +18,7 @@
               :video-url="section.video_url"
               :alt="section.title"
               :controls="(section.media_type || 'image') === 'video'"
+              :hoverable="false"
               wrapper-class="detail-media-shell"
               element-class="detail-media"
             />
@@ -118,6 +119,10 @@ watch(
   min-height: 100vh;
 }
 
+.detail-page-shell {
+  width: min(1200px, calc(100% - 32px));
+}
+
 .detail-layout {
   display: grid;
   gap: 18px;
@@ -137,6 +142,12 @@ watch(
 .detail-back:hover {
   background: rgba(141, 79, 42, 0.2);
   transform: translateY(-1px);
+}
+
+:deep(.media-element) {
+  transition: none;
+  transform: none !important;
+  filter: none !important;
 }
 
 .detail-article,
@@ -195,6 +206,10 @@ watch(
 }
 
 @media (max-width: 768px) {
+  .detail-page-shell {
+    width: min(1200px, calc(100% - 20px));
+  }
+
   .detail-article,
   .detail-loading,
   .detail-empty {

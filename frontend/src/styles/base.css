@@ -196,3 +196,28 @@ textarea {
  border-radius: 22px;
  }
 }
+
+
+#app {
+  min-height: 100vh;
+}
+
+.app-route-enter-active,
+.app-route-leave-active {
+  transition: opacity 0.34s ease;
+  will-change: opacity;
+}
+
+.app-route-enter-from,
+.app-route-leave-to {
+  opacity: 0;
+}
+
+.app-route-enter-to,
+.app-route-leave-from {
+  opacity: 1;
+}
+
+.app-route-leave-active {
+  pointer-events: none;
+}
