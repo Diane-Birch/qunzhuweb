@@ -146,12 +146,21 @@ textarea {
  margin-top: 8px;
 }
 
-.rich-text-content img,
-.rich-text-content video {
- width: 100%;
+.rich-text-content img {
+ display: inline-block;
+ width: auto;
  max-width: min(100%, 1200px);
  height: auto;
  margin: 22px 0;
+ vertical-align: top;
+}
+
+.rich-text-content video {
+ display: block;
+ width: 100%;
+ max-width: min(100%, 1200px);
+ height: auto;
+ margin: 22px auto;
 }
 
 .detail-article .section-heading,
