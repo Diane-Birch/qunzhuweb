@@ -21,27 +21,35 @@
               <p v-if="item.subtitle" class="hero-subtitle" :style="{ fontSize: `${item.subtitle_font_size || 13}px` }">{{ item.subtitle }}</p>
               <h1 :style="{ fontSize: `clamp(36px, ${Math.max((item.title_font_size || 72) * 0.1, 4.6)}vw, ${item.title_font_size || 72}px)` }">{{ item.title }}</h1>
               <p v-if="item.description" class="hero-description" :style="{ fontSize: `${item.description_font_size || 17}px` }">{{ item.description }}</p>
-              <a v-if="item.cta_text && item.cta_link" class="hero-cta" :href="item.cta_link">{{ item.cta_text }}</a>
+              <button v-if="item.cta_text && item.cta_link" class="hero-cta" type="button" @click="handleCtaClick(item.cta_link)">
+                {{ item.cta_text }}
+              </button>
             </div>
           </div>
         </div>
       </el-carousel-item>
     </el-carousel>
     <div v-else class="hero-empty page-shell surface-card">
-      <el-empty :description="'\u6682\u65e0\u5df2\u53d1\u5e03\u7684\u8f6e\u64ad\u5185\u5bb9'" />
+      <el-empty :description="'暂无已发布的轮播内容'" />
     </div>
   </section>
 </template>
 
 <script setup>
-import MediaAsset from "./MediaAsset.vue";
+import { nextTick } from "vue";
+import { useRouter } from "vue-router";
 
-defineProps({
+import MediaAsset from "./MediaAsset.vue";
+import { resolveLinkTarget, scrollToHash } from "../utils/sectionNavigation";
+
+const props = defineProps({
   items: {
     type: Array,
     default: () => [],
   },
 });
+
+const router = useRouter();
 
 const positionClass = (position) => {
   const map = {
@@ -56,6 +64,35 @@ const positionClass = (position) => {
     "right-top": "position-right-top",
   };
   return map[position || "left-center"] || "position-left-center";
+};
+
+const handleCtaClick = async (rawLink) => {
+  const { type, target } = resolveLinkTarget(rawLink);
+  if (type === "none") {
+    return;
+  }
+
+  if (type === "section") {
+    try {
+      await router.push({ path: "/", hash: target });
+      await nextTick();
+      if (!scrollToHash(target)) {
+        window.setTimeout(() => {
+          scrollToHash(target);
+        }, 120);
+      }
+    } catch (error) {
+      scrollToHash(target);
+    }
+    return;
+  }
+
+  if (target.startsWith("/")) {
+    await router.push(target);
+    return;
+  }
+
+  window.location.assign(target);
 };
 </script>
 
@@ -119,9 +156,11 @@ h1 {
   align-items: center;
   justify-content: center;
   padding: 14px 26px;
+  border: none;
   border-radius: 999px;
   color: #fff;
   background: rgba(141, 79, 42, 0.92);
+  cursor: pointer;
 }
 
 .position-left-center { align-items: center; justify-content: flex-start; text-align: left; }

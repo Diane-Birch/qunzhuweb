@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from backend.app.core.config import get_settings
 from backend.app.core.security import get_password_hash
 from backend.app.models import AdminUser, HeroBanner, NewsArticle, Product, SiteSection, SiteSetting
+from backend.app.schemas.section import SECTION_ROOT_DEFAULTS
 
 
 settings = get_settings()
@@ -173,4 +174,89 @@ def seed_content(db: Session) -> None:
         db.add_all(NewsArticle(**item) for item in DEFAULT_NEWS)
     if not db.query(SiteSetting).first():
         db.add_all(SiteSetting(**item) for item in DEFAULT_SITE_SETTINGS)
+    db.commit()
+    ensure_section_hierarchy(db)
+
+
+def ensure_section_hierarchy(db: Session) -> None:
+    roots = {item.key: item for item in db.query(SiteSection).filter(SiteSection.node_type == "section").all()}
+
+    for config in SECTION_ROOT_DEFAULTS:
+        root = roots.get(config["key"])
+        if root is None:
+            root = SiteSection(
+                key=config["key"],
+                parent_id=None,
+                node_type="section",
+                content_source=config["content_source"],
+                group_key=None,
+                name=config["name"],
+                title=config["title"],
+                subtitle=config["subtitle"],
+                summary=config["summary"],
+                body=None,
+                image_url=None,
+                media_type="image",
+                video_url=None,
+                extra_json=None,
+                sort_order=config["sort_order"],
+                is_active=True,
+            )
+            db.add(root)
+            db.flush()
+            roots[root.key] = root
+
+        if config["content_source"] in {"product", "news"}:
+            intro_key = config["legacy_keys"][0]
+            intro = db.query(SiteSection).filter(SiteSection.key == intro_key).first()
+            if intro:
+                root.name = intro.name or root.name
+                root.title = intro.title or root.title
+                root.subtitle = intro.subtitle or root.subtitle
+                root.summary = intro.summary or intro.body or root.summary
+                root.body = intro.body or root.body
+                root.image_url = intro.image_url or root.image_url
+                root.media_type = intro.media_type or root.media_type or "image"
+                root.video_url = intro.video_url or root.video_url
+                root.extra_json = intro.extra_json or root.extra_json
+                root.is_active = intro.is_active
+
+    for config in SECTION_ROOT_DEFAULTS:
+        if config["content_source"] != "section":
+            continue
+        root = roots[config["key"]]
+        for section in (
+            db.query(SiteSection)
+            .filter(
+                SiteSection.node_type != "section",
+                SiteSection.key.in_(config["legacy_keys"]),
+            )
+            .all()
+        ):
+            section.parent_id = root.id
+            section.node_type = "content"
+            section.content_source = "section"
+            section.group_key = root.key
+
+        for section in (
+            db.query(SiteSection)
+            .filter(
+                SiteSection.node_type != "section",
+                SiteSection.group_key.in_(config["legacy_keys"]),
+            )
+            .all()
+        ):
+            section.parent_id = root.id
+            section.node_type = "content"
+            section.content_source = "section"
+            section.group_key = root.key
+
+    for section in (
+        db.query(SiteSection)
+        .filter(SiteSection.node_type.is_(None))
+        .all()
+    ):
+        section.node_type = "content"
+        section.content_source = section.content_source or "section"
+
     db.commit()

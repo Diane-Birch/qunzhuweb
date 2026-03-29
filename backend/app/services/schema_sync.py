@@ -11,16 +11,24 @@ COLUMN_DEFINITIONS = {
         "text_position": "VARCHAR(40)",
     },
     "site_sections": {
+        "parent_id": "INTEGER",
+        "node_type": "VARCHAR(20)",
+        "content_source": "VARCHAR(20)",
+        "summary": "VARCHAR(500)",
+        "group_key": "VARCHAR(80)",
         "media_type": "VARCHAR(20)",
         "video_url": "VARCHAR(500)",
+        "pinned_at": "DATETIME",
     },
     "products": {
         "media_type": "VARCHAR(20)",
         "video_url": "VARCHAR(500)",
+        "pinned_at": "DATETIME",
     },
     "news_articles": {
         "media_type": "VARCHAR(20)",
         "video_url": "VARCHAR(500)",
+        "pinned_at": "DATETIME",
     },
 }
 
@@ -59,6 +67,63 @@ def ensure_legacy_columns(engine) -> None:
                 """
             )
         )
-        connection.execute(text("UPDATE site_sections SET media_type = COALESCE(media_type, 'image')"))
-        connection.execute(text("UPDATE products SET media_type = COALESCE(media_type, 'image')"))
-        connection.execute(text("UPDATE news_articles SET media_type = COALESCE(media_type, 'image')"))
+        connection.execute(
+            text(
+                """
+                UPDATE site_sections
+                SET
+                    parent_id = parent_id,
+                    node_type = COALESCE(node_type, 'content'),
+                    content_source = COALESCE(content_source, 'section'),
+                    summary = COALESCE(summary, body),
+                    group_key = CASE
+                        WHEN group_key IS NOT NULL AND group_key != '' THEN group_key
+                        WHEN `key` IN ('core_selling', 'brand_story', 'revitalization', 'product_intro', 'news_intro') THEN `key`
+                        ELSE group_key
+                    END,
+                    media_type = COALESCE(media_type, 'image'),
+                    sort_order = CASE
+                        WHEN COALESCE(node_type, 'content') = 'content' AND COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN 1
+                        ELSE COALESCE(sort_order, 0)
+                    END,
+                    pinned_at = CASE
+                        WHEN COALESCE(node_type, 'content') = 'content' AND COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN NULL
+                        ELSE pinned_at
+                    END
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                UPDATE products
+                SET
+                    media_type = COALESCE(media_type, 'image'),
+                    sort_order = CASE
+                        WHEN COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN 1
+                        ELSE COALESCE(sort_order, 0)
+                    END,
+                    pinned_at = CASE
+                        WHEN COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN NULL
+                        ELSE pinned_at
+                    END
+                """
+            )
+        )
+        connection.execute(
+            text(
+                """
+                UPDATE news_articles
+                SET
+                    media_type = COALESCE(media_type, 'image'),
+                    sort_order = CASE
+                        WHEN COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN 1
+                        ELSE COALESCE(sort_order, 0)
+                    END,
+                    pinned_at = CASE
+                        WHEN COALESCE(sort_order, 0) <= 0 AND pinned_at IS NULL THEN NULL
+                        ELSE pinned_at
+                    END
+                """
+            )
+        )

@@ -37,4 +37,4 @@ class NewsUpdate(NewsBase):
 
 
 class NewsRead(NewsBase, TimestampSchema):
-    pass
+    pinned_at: Optional[datetime] = None

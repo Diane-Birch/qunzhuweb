@@ -1,3 +1,1 @@
-﻿<template>
-  <router-view />
-</template>
+﻿<template>   <div class="app-route-shell">     <router-view v-slot="{ Component, route }">       <transition name="app-route" mode="out-in">         <component :is="Component" :key="route.fullPath" />       </transition>     </router-view>   </div> </template>  <style scoped> .app-route-shell {   min-height: 100vh;   overflow-x: clip; } </style>

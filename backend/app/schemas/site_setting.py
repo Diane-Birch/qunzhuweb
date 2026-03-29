@@ -1,8 +1,9 @@
-from typing import Optional
+﻿from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
 from backend.app.schemas.common import TimestampSchema
+from backend.app.schemas.footer_qr_code import FooterQRCodeRead, FooterQRCodeUpdate
 
 
 class SiteSettingBase(BaseModel):
@@ -26,15 +27,12 @@ class SiteSettingRead(SiteSettingBase, TimestampSchema):
 
 
 class FooterSettingsRead(BaseModel):
-    footer_qr: SiteSettingRead
+    footer_qr_codes: List[FooterQRCodeRead] = Field(default_factory=list)
     footer_filing: SiteSettingRead
 
 
 class FooterSettingsUpdate(BaseModel):
-    qr_name: Optional[str] = Field(None, max_length=120)
-    qr_description: Optional[str] = Field(None, max_length=255)
-    qr_image_url: Optional[str] = Field(None, max_length=500)
-    qr_is_active: bool = True
+    qr_codes: List[FooterQRCodeUpdate] = Field(default_factory=list)
     filing_name: Optional[str] = Field(None, max_length=120)
     filing_text: Optional[str] = Field(None, max_length=255)
     filing_is_active: bool = True

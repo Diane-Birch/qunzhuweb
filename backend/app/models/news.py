@@ -1,4 +1,4 @@
-from datetime import datetime
+﻿from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
@@ -18,3 +18,4 @@ class NewsArticle(BaseModel, SortableActiveMixin):
     media_type = Column(String(20), nullable=True)
     video_url = Column(String(500), nullable=True)
     published_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    pinned_at = Column(DateTime, nullable=True)

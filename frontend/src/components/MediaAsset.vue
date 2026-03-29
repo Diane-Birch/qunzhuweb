@@ -1,5 +1,5 @@
-<template>
-  <div v-if="hasRenderableMedia" class="media-asset" :class="wrapperClass">
+﻿<template>
+  <div v-if="hasRenderableMedia" class="media-asset" :class="[{ 'is-hoverable': hoverable && resolvedMediaType === 'image' }, wrapperClass]">
     <video
       v-if="resolvedMediaType === 'video' && videoUrl"
       class="media-element"
@@ -52,6 +52,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  hoverable: {
+    type: Boolean,
+    default: true,
+  },
   wrapperClass: {
     type: [String, Array, Object],
     default: "",
@@ -77,5 +81,12 @@ const hasRenderableMedia = computed(() => Boolean((resolvedMediaType.value === "
   height: 100%;
   object-fit: cover;
   display: block;
+  transition: transform 0.38s ease, filter 0.38s ease;
+  transform-origin: center center;
+}
+
+.is-hoverable:hover .media-element {
+  transform: scale(1.08);
+  filter: saturate(1.02);
 }
 </style>

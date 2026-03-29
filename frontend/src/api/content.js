@@ -1,7 +1,37 @@
-import http from "./http";
+﻿import http from "./http";
 
 export const fetchHomepage = async () => {
   const { data } = await http.get("/public/home");
+  return data;
+};
+
+export const fetchPublicSectionGroup = async (groupKey, params) => {
+  const { data } = await http.get(`/public/section-groups/${groupKey}`, { params });
+  return data;
+};
+
+export const fetchSectionDetail = async (sectionKey) => {
+  const { data } = await http.get(`/public/sections/${sectionKey}`);
+  return data;
+};
+
+export const fetchPublicProducts = async (params) => {
+  const { data } = await http.get("/public/products", { params });
+  return data;
+};
+
+export const fetchProductDetail = async (productId) => {
+  const { data } = await http.get(`/public/products/${productId}`);
+  return data;
+};
+
+export const fetchPublicNews = async (params) => {
+  const { data } = await http.get("/public/news", { params });
+  return data;
+};
+
+export const fetchNewsDetail = async (newsId) => {
+  const { data } = await http.get(`/public/news/${newsId}`);
   return data;
 };
 
@@ -59,6 +89,26 @@ export const fetchSections = async (params) => {
   return data;
 };
 
+export const fetchSectionRoots = async () => {
+  const { data } = await http.get("/sections/roots");
+  return data;
+};
+
+export const createSectionRoot = async (payload) => {
+  const { data } = await http.post("/sections/roots", payload);
+  return data;
+};
+
+export const updateSectionRoot = async (id, payload) => {
+  const { data } = await http.put(`/sections/roots/${id}`, payload);
+  return data;
+};
+
+export const deleteSectionRoot = async (id) => {
+  const { data } = await http.delete(`/sections/roots/${id}`);
+  return data;
+};
+
 export const createSection = async (payload) => {
   const { data } = await http.post("/sections", payload);
   return data;
@@ -66,6 +116,16 @@ export const createSection = async (payload) => {
 
 export const updateSection = async (id, payload) => {
   const { data } = await http.put(`/sections/${id}`, payload);
+  return data;
+};
+
+export const pinSection = async (id) => {
+  const { data } = await http.post(`/sections/${id}/pin`);
+  return data;
+};
+
+export const unpinSection = async (id) => {
+  const { data } = await http.post(`/sections/${id}/unpin`);
   return data;
 };
 
@@ -89,6 +149,16 @@ export const updateProduct = async (id, payload) => {
   return data;
 };
 
+export const pinProduct = async (id) => {
+  const { data } = await http.post(`/products/${id}/pin`);
+  return data;
+};
+
+export const unpinProduct = async (id) => {
+  const { data } = await http.post(`/products/${id}/unpin`);
+  return data;
+};
+
 export const deleteProduct = async (id) => {
   const { data } = await http.delete(`/products/${id}`);
   return data;
@@ -106,6 +176,16 @@ export const createNews = async (payload) => {
 
 export const updateNews = async (id, payload) => {
   const { data } = await http.put(`/news/${id}`, payload);
+  return data;
+};
+
+export const pinNews = async (id) => {
+  const { data } = await http.post(`/news/${id}/pin`);
+  return data;
+};
+
+export const unpinNews = async (id) => {
+  const { data } = await http.post(`/news/${id}/unpin`);
   return data;
 };
 
